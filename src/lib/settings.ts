@@ -1,4 +1,5 @@
 import type {
+  DisplayToggles,
   OverlaySettings,
   PointConfig,
   ThemePreset,
@@ -81,6 +82,9 @@ function deepMerge<T>(base: T, patch: unknown): T {
 
   const result: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(patch)) {
+    if (key === "__proto__" || key === "constructor" || key === "prototype") {
+      continue;
+    }
     // Theme overrides are a complete map, not a nested config: replacing the
     // whole object lets the dashboard clear a color back to the preset.
     result[key] =
@@ -119,6 +123,29 @@ function clampSettings(settings: OverlaySettings): OverlaySettings {
       Number.MAX_SAFE_INTEGER,
     );
   }
+
+  const unknownDisplay = settings.display as unknown as Record<string, unknown>;
+  for (const key of Object.keys(DEFAULT_SETTINGS.display) as (keyof DisplayToggles)[]) {
+    if (typeof unknownDisplay[key] !== "boolean") {
+      settings.display[key] = DEFAULT_SETTINGS.display[key];
+    }
+  }
+
+  const mask =
+    typeof settings.anonymousMaskName === "string"
+      ? settings.anonymousMaskName.trim()
+      : "";
+  settings.anonymousMaskName = mask || "Anonymous";
+
+  const overrides: Record<string, string> = {};
+  if (isPlainObject(settings.theme.overrides)) {
+    for (const [key, value] of Object.entries(settings.theme.overrides)) {
+      if (/^--lb-[a-z0-9-]+$/.test(key) && typeof value === "string") {
+        overrides[key] = value;
+      }
+    }
+  }
+  settings.theme.overrides = overrides;
 
   return settings;
 }

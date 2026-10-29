@@ -33,4 +33,21 @@ describe("Leaderboard", () => {
     );
     expect(screen.queryByText("Nightbot")).toBeNull();
   });
+
+  it("keeps names and points when the ranks toggle is off", () => {
+    render(
+      <Leaderboard
+        rows={[{ userId: "u", username: "Alice", points: 10 }]}
+        settings={{
+          ...DEFAULT_SETTINGS,
+          display: { ...DEFAULT_SETTINGS.display, ranks: false },
+        }}
+        window="this_stream"
+      />,
+    );
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(screen.getByText("10")).toBeInTheDocument();
+    expect(screen.queryByText("#1")).toBeNull();
+    expect(screen.queryByText("🥇")).toBeNull();
+  });
 });

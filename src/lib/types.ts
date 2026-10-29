@@ -123,4 +123,6 @@ export type OverlayState = {
   settings: OverlaySettings;
   window: WindowType;
   windows?: OverlayWindowMap;
+  /** A flush was skipped by the 2s throttle; the overlay should refetch soon. */
+  pending?: boolean;
 };

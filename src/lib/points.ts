@@ -12,7 +12,10 @@ export function computePoints(
   config: PointConfig,
 ): number {
   const safeAmount = Number.isFinite(amount) ? amount : 0;
-  const rate = config[eventType];
+  const configured = config[eventType];
+  const rate = typeof configured === "number" && Number.isFinite(configured)
+    ? configured
+    : 0;
   const raw = eventType === "tip" ? (safeAmount / 100) * rate : safeAmount * rate;
   return Math.max(0, Math.floor(raw));
 }

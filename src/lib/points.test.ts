@@ -14,6 +14,14 @@ describe("computePoints", () => {
     expect(computePoints("raid", 20, cfg)).toBe(1000));
   it("never returns negative points", () =>
     expect(computePoints("tip", -50, cfg)).toBe(0));
+  it("treats a missing rate as zero instead of NaN", () =>
+    expect(
+      computePoints("bit", 100, { tip: 100 } as unknown as typeof cfg),
+    ).toBe(0));
+  it("treats a non-numeric rate as zero", () =>
+    expect(
+      computePoints("raid", 5, { ...cfg, raid: "x" } as unknown as typeof cfg),
+    ).toBe(0));
 });
 
 describe("shouldCredit", () => {

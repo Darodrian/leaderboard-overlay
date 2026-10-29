@@ -1,4 +1,5 @@
 import "server-only";
+import { licenseIsActive } from "./access";
 import { mapStreamerRow, type StreamerRow } from "./streamers";
 import { createAdminClient } from "./supabase/admin";
 import type { Streamer } from "./types";
@@ -27,5 +28,7 @@ export async function loadStreamerByToken(
     .maybeSingle();
 
   if (error || !data) return null;
-  return mapStreamerRow(data as StreamerRow);
+  const streamer = mapStreamerRow(data as StreamerRow);
+  if (!(await licenseIsActive(streamer.licenseKey))) return null;
+  return streamer;
 }

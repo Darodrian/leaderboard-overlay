@@ -16,8 +16,9 @@ the optional Twitch chat bot.
    (Project Settings → API).
 2. Open the SQL editor and run
    [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql).
-   It creates six tables, enables RLS on every one, and adds
-   `flush_streamer_aggregates(uuid)`.
+   It creates six tables, enables RLS on every one, adds
+   `flush_streamer_aggregates(uuid, boolean)`, and revokes it from the public
+   API roles.
 3. Enable Realtime for broadcasts (Realtime is used for server → overlay messages,
    not Postgres changes): Project Settings → Realtime is on by default on paid and
    free plans; no table publication is required.
@@ -163,6 +164,10 @@ Customer flow: sign in with Twitch → paste the key in the dashboard → the ke
 binds permanently to that Twitch user ID. A different account gets HTTP 409.
 Deactivate with `update licenses set is_active = false where key = '...';`.
 
+The overlay is license-gated: `/overlay/[token]`, the data endpoint, the tip
+bridge, and chat commands all 404 once the bound license is missing, inactive, or
+expired. Revoking a sale therefore stops the overlay without touching OBS.
+
 ## 6. OBS
 
 1. In the dashboard, copy the overlay URL (after binding a license).
@@ -230,6 +235,10 @@ command.
 - [ ] A test tip below the threshold is ignored; one above appears.
 - [ ] Token regeneration makes the old overlay URL 404.
 - [ ] Overlay keeps the last rows when Supabase is paused (offline fallback).
+- [ ] The overlay 404s while no active license is bound (license gate).
+- [ ] A burst of events writes aggregates at most once per two seconds
+      (`streamers.last_flush_at` moves at most one tick per burst, and
+      `flush_pending` drains on the next overlay read).
 - [ ] Chat bot refreshes and clears with a mod account; a viewer is rejected.
 - [ ] `npm test`, `npx tsc --noEmit`, and `npm run build` are green before shipping.
 
@@ -241,3 +250,14 @@ command.
   service-role key and policies are defense-in-depth only.
 - The webhook runs on the Edge runtime, which Next 16 marks deprecated. It still
   builds; migrate to the Node runtime when Edge support is removed.
+- "This Stream" starts at the first ever event and only resets on
+  `!leaderboard clear stream`; there is no `stream.online` subscription that opens
+  a new window when a stream starts. On a fresh install it therefore matches
+  All-Time until the first clear.
+- `overlay_sessions` is written by token regeneration but never read; the OBS
+  token on `streamers` is the source of truth.
+- License attempts are not rate limited; a short human-typable key can be
+  guessed slowly. Use longer keys if that matters for your storefront.
+- The 2-second aggregate throttle lives in Postgres. The old in-memory
+  `DebounceBuffer` was removed because a serverless warm instance cannot
+  guarantee a trailing flush.

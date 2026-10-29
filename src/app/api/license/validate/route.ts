@@ -46,24 +46,46 @@ export async function POST(request: Request) {
   }
 
   if (!license.twitch_user_id) {
-    const { error: bindError } = await supabase
+    // Atomic claim: only one concurrent request can set a NULL binding, and a
+    // zero-row update (race lost) must not be reported as success.
+    const { data: bound, error: bindError } = await supabase
       .from("licenses")
       .update({
         twitch_user_id: session.twitchUserId,
         bound_at: new Date().toISOString(),
       })
       .eq("key", licenseKey)
-      .is("twitch_user_id", null);
+      .is("twitch_user_id", null)
+      .select("key");
 
     if (bindError) {
       return Response.json({ error: "binding failed" }, { status: 500 });
     }
+
+    if (!bound || bound.length === 0) {
+      const { data: current } = await supabase
+        .from("licenses")
+        .select("twitch_user_id")
+        .eq("key", licenseKey)
+        .maybeSingle();
+
+      if (current?.twitch_user_id !== session.twitchUserId) {
+        return Response.json(
+          { error: "license already bound to another account" },
+          { status: 409 },
+        );
+      }
+    }
   }
 
-  await supabase
+  const { error: streamerError } = await supabase
     .from("streamers")
     .update({ license_key: licenseKey })
     .eq("id", session.streamerId);
+
+  if (streamerError) {
+    return Response.json({ error: "binding failed" }, { status: 500 });
+  }
 
   return Response.json({ ok: true, boundTwitchUserId: session.twitchUserId });
 }

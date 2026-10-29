@@ -1,4 +1,5 @@
 import "server-only";
+import { licenseIsActive } from "./access";
 import { tokenIsValid } from "./licensing";
 import { mapStreamerRow, toOverlaySettings, type StreamerRow } from "./streamers";
 import { createAdminClient } from "./supabase/admin";
@@ -16,6 +17,8 @@ export const WINDOW_TYPES: WindowType[] = [
   "alltime",
 ];
 
+type StreamerRowWithFlush = StreamerRow & { flush_pending?: boolean };
+
 export async function loadOverlayState(
   token: string,
 ): Promise<OverlayState | null> {
@@ -32,11 +35,28 @@ export async function loadOverlayState(
   if (!tokenIsValid({ token: streamer.obsToken, isActive: true }, token)) {
     return null;
   }
+  if (!(await licenseIsActive(streamer.licenseKey))) return null;
 
-  const { data: aggregateRows } = await supabase
+  let pending = false;
+  if ((data as StreamerRowWithFlush).flush_pending) {
+    const { data: flushed, error: flushError } = await supabase.rpc(
+      "flush_streamer_aggregates",
+      { p_streamer_id: streamer.id },
+    );
+    if (flushError) {
+      throw new Error(`aggregate flush failed: ${flushError.message}`);
+    }
+    pending = flushed === false;
+  }
+
+  const { data: aggregateRows, error: aggregateError } = await supabase
     .from("leaderboard_aggregates")
     .select("window_type,user_id,username,points,last_event_at")
     .eq("streamer_id", streamer.id);
+
+  if (aggregateError) {
+    throw new Error(`aggregate query failed: ${aggregateError.message}`);
+  }
 
   const windows = Object.fromEntries(
     WINDOW_TYPES.map((window) => [window, [] as LeaderboardRow[]]),
@@ -62,5 +82,6 @@ export async function loadOverlayState(
     settings: toOverlaySettings(streamer),
     window: "this_stream",
     windows,
+    pending,
   };
 }

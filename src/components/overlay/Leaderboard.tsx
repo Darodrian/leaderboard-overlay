@@ -18,15 +18,14 @@ export function Leaderboard({ rows, settings, window }: Props) {
     .sort((a, b) => b.points - a.points)
     .slice(0, 25);
 
-  if (!settings.display.ranks) return null;
-
   const max = Math.max(1, ...visible.map((row) => row.points));
+  const showRankColumn = settings.display.ranks;
 
   return (
     <ol className="lb-list" data-window={window}>
       {visible.map((row, index) => {
         const rank = index + 1;
-        const showMedal = settings.display.medals && rank <= 3;
+        const showMedal = showRankColumn && settings.display.medals && rank <= 3;
 
         return (
           <li className="lb-row" data-rank={rank} key={row.userId}>
@@ -35,7 +34,7 @@ export function Leaderboard({ rows, settings, window }: Props) {
                 {MEDALS[rank - 1]}
               </span>
             ) : null}
-            {settings.display.rankNumbers ? (
+            {showRankColumn && settings.display.rankNumbers ? (
               <span className="lb-rank">#{rank}</span>
             ) : null}
             <span className="lb-name">{row.username}</span>

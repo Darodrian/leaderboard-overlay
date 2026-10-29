@@ -78,7 +78,7 @@ export async function POST(
 
         const { error: flushError } = await supabase.rpc(
           "flush_streamer_aggregates",
-          { p_streamer_id: streamerId },
+          { p_streamer_id: streamerId, p_force: true },
         );
 
         if (flushError) {

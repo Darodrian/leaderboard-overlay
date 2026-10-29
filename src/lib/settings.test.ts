@@ -36,6 +36,39 @@ describe("mergeSettings", () => {
     const next = applySettings(base, { theme: { overrides: {} } });
     expect(next.theme.overrides).toEqual({});
   });
+
+  it("coerces non-boolean display toggles back to the default", () => {
+    const settings = applySettings(DEFAULT_SETTINGS, {
+      display: { ranks: "false" as unknown as boolean },
+    });
+    expect(settings.display.ranks).toBe(true);
+  });
+
+  it("keeps the anonymous mask non-empty and trimmed", () => {
+    expect(
+      applySettings(DEFAULT_SETTINGS, { anonymousMaskName: "  Anonymous " })
+        .anonymousMaskName,
+    ).toBe("Anonymous");
+    expect(
+      applySettings(DEFAULT_SETTINGS, { anonymousMaskName: "   " })
+        .anonymousMaskName,
+    ).toBe("Anonymous");
+  });
+
+  it("drops theme overrides that are not CSS custom properties", () => {
+    // JSON.parse gives `__proto__` as an own key, which is what a request body
+    // would contain (an object literal would set the prototype instead).
+    const overrides = JSON.parse(
+      '{"--lb-bg":"#123456","color":"red","__proto__":{"polluted":true}}',
+    ) as Record<string, string>;
+
+    const settings = applySettings(DEFAULT_SETTINGS, {
+      theme: { overrides },
+    });
+
+    expect(settings.theme.overrides).toEqual({ "--lb-bg": "#123456" });
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  });
 });
 
 describe("themes", () => {

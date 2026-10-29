@@ -17,6 +17,17 @@ export async function POST(request: Request) {
   const rawBody = await request.text();
   const messageType = request.headers.get("Twitch-Eventsub-Message-Type");
 
+  const secret = process.env.TWITCH_WEBHOOK_SECRET;
+  if (!secret) {
+    return new Response("webhook secret not configured", { status: 500 });
+  }
+
+  // Verify every message type, including the verification challenge, so only
+  // Twitch can make this endpoint echo a challenge or revoke a subscription.
+  if (!(await verifyTwitchSignature(request.headers, rawBody, secret))) {
+    return new Response("invalid signature", { status: 403 });
+  }
+
   if (messageType === "webhook_callback_verification") {
     let body: EventSubBody;
     try {
@@ -29,15 +40,6 @@ export async function POST(request: Request) {
 
   if (messageType === "revocation") {
     return new Response(null, { status: 204 });
-  }
-
-  const secret = process.env.TWITCH_WEBHOOK_SECRET;
-  if (!secret) {
-    return new Response("webhook secret not configured", { status: 500 });
-  }
-
-  if (!(await verifyTwitchSignature(request.headers, rawBody, secret))) {
-    return new Response("invalid signature", { status: 403 });
   }
 
   let body: EventSubBody;

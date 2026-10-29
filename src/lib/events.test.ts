@@ -88,6 +88,55 @@ describe("handleEvent", () => {
     expect(d.broadcast).not.toHaveBeenCalled();
   });
 
+  it("re-flushes on a duplicate delivery so a missed flush self-heals", async () => {
+    const d = deps({
+      insertPointEvent: vi.fn().mockResolvedValue("duplicate"),
+    });
+    await handleEvent(d, {
+      subscriptionType: "channel.cheer",
+      event: { user_id: "u", bits: 10 },
+      messageId: "m3",
+      broadcasterUserId: "owner",
+    });
+    expect(d.flushAggregates).toHaveBeenCalledWith("s1");
+  });
+
+  it("ignores an event that awards zero points", async () => {
+    const d = deps();
+    const out = await handleEvent(d, {
+      subscriptionType: "channel.subscription.gift",
+      event: { user_id: "gifter", user_name: "G" },
+      messageId: "m7",
+      broadcasterUserId: "owner",
+    });
+    expect(out).toBe("ignored");
+    expect(d.insertPointEvent).not.toHaveBeenCalled();
+  });
+
+  it("still masks anonymous gifters when the mask is cleared", async () => {
+    const d = deps({
+      findStreamer: vi
+        .fn()
+        .mockResolvedValue({ ...streamer, anonymousMaskName: "  " }),
+    });
+    await handleEvent(d, {
+      subscriptionType: "channel.cheer",
+      event: {
+        user_id: "u",
+        user_login: "real",
+        user_name: "Real",
+        bits: 10,
+        is_anonymous: true,
+      },
+      messageId: "m8",
+      broadcasterUserId: "owner",
+    });
+    const row = (d.insertPointEvent as ReturnType<typeof vi.fn>).mock
+      .calls[0][0];
+    expect(row.creditedUsername).not.toBe("Real");
+    expect(row.creditedUsername).toBe("Anonymous");
+  });
+
   it("applies the anonymous mask to the credited username", async () => {
     const d = deps();
     await handleEvent(d, {

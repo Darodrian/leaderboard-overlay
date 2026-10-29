@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { OverlayState } from "@/lib/types";
 
 const REFRESH_THROTTLE_MS = 400;
+const PENDING_RETRY_MS = 2100;
 
 export function useOverlayRealtime(token: string, initial: OverlayState) {
   const [state, setState] = useState<OverlayState>(initial);
@@ -17,10 +18,23 @@ export function useOverlayRealtime(token: string, initial: OverlayState) {
 
     let canceled = false;
     let removeChannel: (() => void) | null = null;
+    let trailing: ReturnType<typeof setTimeout> | null = null;
+    let retry: ReturnType<typeof setTimeout> | null = null;
 
+    // Trailing throttle: a broadcast inside the window schedules one refetch
+    // for the end of the window instead of dropping the last event.
     const refresh = async () => {
       const now = Date.now();
-      if (now - lastRefresh.current < REFRESH_THROTTLE_MS) return;
+      const elapsed = now - lastRefresh.current;
+      if (elapsed < REFRESH_THROTTLE_MS) {
+        if (trailing === null) {
+          trailing = setTimeout(() => {
+            trailing = null;
+            void refresh();
+          }, REFRESH_THROTTLE_MS - elapsed);
+        }
+        return;
+      }
       lastRefresh.current = now;
 
       try {
@@ -29,9 +43,20 @@ export function useOverlayRealtime(token: string, initial: OverlayState) {
         });
         if (!response.ok) return;
         const data = (await response.json()) as OverlayState;
-        if (!canceled) {
-          setState(data);
-          setHasLiveData(true);
+        if (canceled) return;
+
+        setState(data);
+        setHasLiveData(true);
+
+        // The server throttles aggregate writes to one per two seconds, so a
+        // skipped flush reports pending; come back once the window has passed.
+        if (data.pending) {
+          if (retry !== null) clearTimeout(retry);
+          retry = setTimeout(() => {
+            retry = null;
+            lastRefresh.current = 0;
+            void refresh();
+          }, PENDING_RETRY_MS);
         }
       } catch {
         // Keep showing the cached payload instead of blanking the overlay.
@@ -62,6 +87,8 @@ export function useOverlayRealtime(token: string, initial: OverlayState) {
 
     return () => {
       canceled = true;
+      if (trailing !== null) clearTimeout(trailing);
+      if (retry !== null) clearTimeout(retry);
       removeChannel?.();
     };
   }, [token]);

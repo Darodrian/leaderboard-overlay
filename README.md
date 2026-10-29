@@ -28,7 +28,9 @@ npm run dev
 ```
 
 Apply `supabase/migrations/0001_init.sql` in the Supabase SQL editor before the
-first login. Full setup (Supabase, Twitch app, EventSub, Vercel) is in
+first login. The overlay is license-gated, so also issue yourself a key and bind
+it from the dashboard (see `docs/VERCEL_SETUP.md` §5). Full setup (Supabase,
+Twitch app, EventSub, Vercel) is in
 [`docs/VERCEL_SETUP.md`](docs/VERCEL_SETUP.md).
 
 ## Scripts
@@ -76,17 +78,22 @@ by `amountCents / 100`. All other rates are points per unit.
 | Raid | `channel.raid` | Raider, viewers × rate |
 
 Gift recipients are always ignored, so a gifted bundle is credited once to the
-gifter. Anonymous events are stored under the streamer's mask name, and the real
-username never reaches the broadcast payload.
+gifter. Anonymous events are stored under the streamer's mask name (never the
+real login), including when the mask is blank or cleared. Events worth zero
+points (a gift bundle with no `total`, a raid with 0 viewers) are ignored
+instead of adding empty leaderboard rows.
 
 ## Data and resilience
 
 - `point_events` is an append-only ledger with a unique
   `(streamer_id, twitch_event_id)` key, so retried deliveries are no-ops.
-- `flush_streamer_aggregates(uuid)` recomputes every window under a per-streamer
-  advisory lock.
+- `flush_streamer_aggregates(uuid, boolean)` recomputes every window under a
+  per-streamer advisory lock, at most once per two seconds. A call inside the
+  window marks the streamer `flush_pending` instead of writing, and the next
+  overlay read drains it (`p_force` skips the throttle for `clear stream`).
 - Aggregates are recomputed once per event batch; the overlay refetches a
-  throttled snapshot on each broadcast.
+  throttled snapshot on each broadcast, with a trailing refetch so the last
+  event of a burst is never dropped.
 - The overlay caches its last payload in `localStorage` and keeps rendering it if
   Realtime or Postgres is unavailable.
 - OBS token regeneration replaces `streamers.obs_token` immediately; old URLs stop
@@ -95,9 +102,14 @@ username never reaches the broadcast payload.
 ## Security model
 
 - Dashboard auth is a signed, httpOnly `lb_session` cookie created by Twitch OAuth.
+  The payload carries a 30-day `exp` claim, so a replayed cookie stops working.
 - All database access is server-side with the service-role key. RLS is enabled on
-  every table as defense-in-depth; anon/authenticated clients get nothing.
-- EventSub requests are verified with HMAC-SHA256 and a 5-minute timestamp window.
+  every table as defense-in-depth; anon/authenticated clients get nothing, and
+  the recompute function is revoked from `anon`/`authenticated`.
+- Overlay data, tip ingestion, and chat commands all require a license that is
+  bound, active, and unexpired — a leaked overlay token alone is not enough.
+- EventSub requests are verified with HMAC-SHA256 and a 5-minute timestamp window,
+  including the callback verification challenge.
 - Twitch access tokens are encrypted with AES-256-GCM (`TOKEN_ENCRYPTION_KEY`).
 - The OBS URL token is 32 random bytes, base64url. It is the overlay channel name
   and the tip endpoint secret — treat it like a password.

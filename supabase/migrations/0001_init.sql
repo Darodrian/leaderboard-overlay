@@ -20,6 +20,8 @@ create table if not exists streamers (
   visuals jsonb not null default '{"opacity":100,"fontSize":18}'::jsonb,
   theme jsonb not null default '{"preset":"midnight","overrides":{}}'::jsonb,
   rotation jsonb not null default '{"enabled":false,"intervalMs":30000}'::jsonb,
+  last_flush_at timestamptz,
+  flush_pending boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -134,8 +136,15 @@ create policy leaderboard_aggregates_self on leaderboard_aggregates
   for select using (streamer_id = auth.uid());
 
 -- Recompute every window for one streamer. Idempotent; serialised per streamer.
-create or replace function flush_streamer_aggregates(p_streamer_id uuid)
-returns void
+-- At most one recompute per two seconds unless p_force is true: a skipped call
+-- marks the streamer as pending so the next read can drain it.
+drop function if exists public.flush_streamer_aggregates(uuid);
+
+create or replace function flush_streamer_aggregates(
+  p_streamer_id uuid,
+  p_force boolean default false
+)
+returns boolean
 language plpgsql
 security definer
 set search_path = public
@@ -143,8 +152,23 @@ as $$
 declare
   v_window text;
   v_since timestamptz;
+  v_last timestamptz;
 begin
   perform pg_advisory_xact_lock(hashtext(p_streamer_id::text));
+
+  select last_flush_at into v_last
+    from streamers where id = p_streamer_id;
+
+  if not p_force
+     and v_last is not null
+     and now() - v_last < interval '2 seconds' then
+    update streamers set flush_pending = true where id = p_streamer_id;
+    return false;
+  end if;
+
+  update streamers
+    set last_flush_at = now(), flush_pending = false
+    where id = p_streamer_id;
 
   foreach v_window in array array['this_stream', '7d', '30d', 'alltime']
   loop
@@ -171,7 +195,7 @@ begin
       p_streamer_id,
       v_window,
       credited_user_id,
-      max(credited_username),
+      (array_agg(credited_username order by is_anonymous desc, created_at desc))[1],
       sum(points_awarded)::integer,
       max(created_at)
     from point_events
@@ -179,5 +203,14 @@ begin
       and created_at >= v_since
     group by credited_user_id;
   end loop;
+
+  return true;
 end;
 $$;
+
+-- The anon key ships to browsers, so the recompute function must not be
+-- callable by anon/authenticated clients. Server routes use the service role.
+revoke all on function public.flush_streamer_aggregates(uuid, boolean)
+  from public, anon, authenticated;
+grant execute on function public.flush_streamer_aggregates(uuid, boolean)
+  to service_role;

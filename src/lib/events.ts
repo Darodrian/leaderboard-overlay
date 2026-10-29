@@ -40,10 +40,11 @@ export async function handleEvent(
   }
 
   const points = computePoints(parsed.eventType, parsed.amount, streamer.pointConfig);
-  const creditedUsername =
-    parsed.isAnonymous && streamer.anonymousMaskName
-      ? streamer.anonymousMaskName
-      : parsed.username;
+  if (points === 0) return "ignored";
+
+  const creditedUsername = parsed.isAnonymous
+    ? streamer.anonymousMaskName?.trim() || "Anonymous"
+    : parsed.username;
 
   const row: PointEventInput = {
     streamerId: streamer.id,
@@ -58,7 +59,12 @@ export async function handleEvent(
   };
 
   const result = await deps.insertPointEvent(row);
-  if (result === "duplicate") return "duplicate";
+  if (result === "duplicate") {
+    // The original delivery may have inserted the row but failed before the
+    // flush, so a retry repairs the aggregates instead of returning early.
+    await deps.flushAggregates(streamer.id);
+    return "duplicate";
+  }
 
   await deps.flushAggregates(streamer.id);
   await deps.broadcast(streamer, {
