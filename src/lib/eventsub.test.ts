@@ -83,6 +83,29 @@ describe("parseEvent gifted subs", () => {
     });
   });
 
+  it("credits a normal channel.subscribe", () => {
+    const p = parseEvent("channel.subscribe", {
+      user_id: "sub-2",
+      user_login: "s2",
+      user_name: "S2",
+      is_gift: false,
+    });
+    expect(p).toMatchObject({
+      kind: "credit",
+      eventType: "sub",
+      userId: "sub-2",
+      amount: 1,
+    });
+  });
+
+  it("ignores a gifted channel.subscribe", () => {
+    const p = parseEvent("channel.subscribe", {
+      user_id: "recipient-2",
+      is_gift: true,
+    });
+    expect(p.kind).toBe("ignore");
+  });
+
   it("credits cheer bits", () => {
     const p = parseEvent("channel.cheer", {
       user_id: "u1",

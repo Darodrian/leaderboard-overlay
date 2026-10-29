@@ -1,9 +1,6 @@
-import { broadcastToOverlay } from "@/lib/broadcast";
+import { createEventDeps } from "@/lib/eventDeps";
 import { handleEvent } from "@/lib/events";
 import { verifyTwitchSignature } from "@/lib/eventsub";
-import { mapStreamerRow, type StreamerRow } from "@/lib/streamers";
-import { createAdminClient } from "@/lib/supabase/admin";
-import type { PointEventInput } from "@/lib/types";
 
 export const runtime = "edge";
 
@@ -59,53 +56,12 @@ export async function POST(request: Request) {
     return new Response("bad payload", { status: 400 });
   }
 
-  const supabase = createAdminClient();
-
-  const result = await handleEvent(
-    {
-      findStreamer: async (twitchUserId) => {
-        const { data, error } = await supabase
-          .from("streamers")
-          .select("*")
-          .eq("twitch_user_id", twitchUserId)
-          .maybeSingle();
-
-        if (error || !data) return null;
-        return mapStreamerRow(data as StreamerRow);
-      },
-      insertPointEvent: async (row: PointEventInput) => {
-        const { error } = await supabase.from("point_events").insert({
-          streamer_id: row.streamerId,
-          twitch_event_id: row.twitchEventId,
-          event_type: row.eventType,
-          credited_user_id: row.creditedUserId,
-          credited_username: row.creditedUsername,
-          amount_cents: row.amountCents,
-          points_awarded: row.pointsAwarded,
-          is_anonymous: row.isAnonymous,
-          raw_payload: row.rawPayload ?? {},
-        });
-
-        if (!error) return "inserted";
-        if (error.code === "23505") return "duplicate";
-        throw new Error(`point_events insert failed: ${error.message}`);
-      },
-      flushAggregates: async (streamerId) => {
-        const { error } = await supabase.rpc("flush_streamer_aggregates", {
-          p_streamer_id: streamerId,
-        });
-        if (error) throw new Error(`aggregate flush failed: ${error.message}`);
-      },
-      broadcast: async (streamer, payload) => {
-        await broadcastToOverlay(
-          streamer.obsToken,
-          "leaderboard.update",
-          payload as Record<string, unknown>,
-        );
-      },
-    },
-    { subscriptionType, event, messageId, broadcasterUserId },
-  );
+  const result = await handleEvent(createEventDeps(), {
+    subscriptionType,
+    event,
+    messageId,
+    broadcasterUserId,
+  });
 
   return Response.json({ result });
 }

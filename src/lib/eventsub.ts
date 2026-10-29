@@ -111,6 +111,10 @@ export function parseEvent(
       };
 
     case "channel.subscription":
+    case "channel.subscribe":
+      if (event.is_gift === true) {
+        return { kind: "ignore", reason: "gift recipient" };
+      }
       return {
         kind: "credit",
         eventType: "sub",
