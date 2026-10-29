@@ -4,7 +4,7 @@ export type StreamerRow = {
   id: string;
   twitch_user_id: string;
   twitch_login: string;
-  license_key: string;
+  license_key: string | null;
   obs_token: string;
   anonymous_mask_name: string | null;
   tip_threshold_cents: number;

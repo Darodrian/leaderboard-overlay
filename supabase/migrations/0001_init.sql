@@ -8,7 +8,7 @@ create table if not exists streamers (
   twitch_user_id text unique not null,
   twitch_login text not null,
   access_token text,
-  license_key text unique not null,
+  license_key text unique,
   obs_token text unique not null,
   obs_token_regenerated_at timestamptz,
   anonymous_mask_name text default 'Mystery Supporter',

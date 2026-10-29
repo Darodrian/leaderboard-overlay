@@ -45,7 +45,7 @@ export type Streamer = {
   id: string;
   twitchUserId: string;
   twitchLogin: string;
-  licenseKey: string;
+  licenseKey: string | null;
   obsToken: string;
   anonymousMaskName: string | null;
   tipThresholdCents: number;
