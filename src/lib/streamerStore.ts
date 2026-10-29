@@ -32,3 +32,20 @@ export async function loadStreamerByToken(
   if (!(await licenseIsActive(streamer.licenseKey))) return null;
   return streamer;
 }
+
+export async function loadStreamerByTwitchUserId(
+  twitchUserId: string,
+): Promise<Streamer | null> {
+  if (!twitchUserId) return null;
+  const supabase = createAdminClient();
+  const { data, error } = await supabase
+    .from("streamers")
+    .select("*")
+    .eq("twitch_user_id", twitchUserId)
+    .maybeSingle();
+
+  if (error || !data) return null;
+  const streamer = mapStreamerRow(data as StreamerRow);
+  if (!(await licenseIsActive(streamer.licenseKey))) return null;
+  return streamer;
+}

@@ -7,7 +7,8 @@ describe("Leaderboard", () => {
   it("hides ranks when the toggle is off", () => {
     render(
       <Leaderboard
-        rows={[{ userId: "u", username: "Alice", points: 10 }]}
+        rows={[{ userId: "u", username: "Alice", quantity: 10 }]}
+        board="points"
         settings={{
           ...DEFAULT_SETTINGS,
           display: {
@@ -26,7 +27,8 @@ describe("Leaderboard", () => {
   it("hides hidden accounts", () => {
     render(
       <Leaderboard
-        rows={[{ userId: "u", username: "Nightbot", points: 99 }]}
+        rows={[{ userId: "u", username: "Nightbot", quantity: 99 }]}
+        board="points"
         settings={{ ...DEFAULT_SETTINGS, hiddenAccounts: ["nightbot"] }}
         window="this_stream"
       />,
@@ -34,10 +36,11 @@ describe("Leaderboard", () => {
     expect(screen.queryByText("Nightbot")).toBeNull();
   });
 
-  it("keeps names and points when the ranks toggle is off", () => {
+  it("keeps names and quantity when the ranks toggle is off", () => {
     render(
       <Leaderboard
-        rows={[{ userId: "u", username: "Alice", points: 10 }]}
+        rows={[{ userId: "u", username: "Alice", quantity: 10 }]}
+        board="points"
         settings={{
           ...DEFAULT_SETTINGS,
           display: { ...DEFAULT_SETTINGS.display, ranks: false },
@@ -46,7 +49,7 @@ describe("Leaderboard", () => {
       />,
     );
     expect(screen.getByText("Alice")).toBeInTheDocument();
-    expect(screen.getByText("10")).toBeInTheDocument();
+    expect(screen.getByText("10 pts")).toBeInTheDocument();
     expect(screen.queryByText("#1")).toBeNull();
     expect(screen.queryByText("🥇")).toBeNull();
   });

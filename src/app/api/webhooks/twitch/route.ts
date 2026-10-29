@@ -1,6 +1,11 @@
 import { createEventDeps } from "@/lib/eventDeps";
 import { handleEvent } from "@/lib/events";
-import { verifyTwitchSignature } from "@/lib/eventsub";
+import { parseClipEvent, verifyTwitchSignature } from "@/lib/eventsub";
+import {
+  loadStreamerByToken,
+  loadStreamerByTwitchUserId,
+} from "@/lib/streamerStore";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "edge";
 
@@ -56,6 +61,33 @@ export async function POST(request: Request) {
 
   if (!subscriptionType || !broadcasterUserId || !event || !messageId) {
     return new Response("bad payload", { status: 400 });
+  }
+
+  // Handle clip events separately (they go to clip_events, not point_events)
+  if (subscriptionType === "channel.clip.created") {
+    const clip = parseClipEvent(event);
+    if (!clip) {
+      return new Response("bad clip payload", { status: 400 });
+    }
+
+    const streamer = await loadStreamerByTwitchUserId(broadcasterUserId);
+    if (!streamer) {
+      return Response.json({ error: "streamer not found" }, { status: 404 });
+    }
+
+    const supabase = createAdminClient();
+    const { error } = await supabase.from("clip_events").insert({
+      streamer_id: streamer.id,
+      twitch_user_id: clip.userId,
+      username: clip.username,
+      clip_id: clip.clipId,
+    });
+
+    if (error) {
+      return Response.json({ error: "clip event failed" }, { status: 500 });
+    }
+
+    return Response.json({ result: "processed" });
   }
 
   const result = await handleEvent(createEventDeps(), {

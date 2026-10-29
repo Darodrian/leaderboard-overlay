@@ -1,4 +1,4 @@
-import type { OverlaySettings, Streamer } from "./types";
+import type { OverlaySettings, ScreenLayout, RotationMode, LabelAlignment, Streamer } from "./types";
 
 export type StreamerRow = {
   id: string;
@@ -15,6 +15,12 @@ export type StreamerRow = {
   visuals: Streamer["visuals"];
   theme: Streamer["theme"];
   rotation: Streamer["rotation"];
+  boards: Streamer["boards"];
+  points_suffix: string;
+  screen_layout: string;
+  rotation_mode: string;
+  font_family: string;
+  label_alignment: string;
   created_at: string;
 };
 
@@ -34,6 +40,12 @@ export function mapStreamerRow(row: StreamerRow): Streamer {
     visuals: row.visuals,
     theme: row.theme,
     rotation: row.rotation,
+    boards: row.boards,
+    pointsSuffix: row.points_suffix,
+    screenLayout: row.screen_layout as ScreenLayout,
+    rotationMode: row.rotation_mode as RotationMode,
+    fontFamily: row.font_family,
+    labelAlignment: row.label_alignment as LabelAlignment,
     createdAt: row.created_at,
   };
 }
@@ -49,6 +61,12 @@ export function toOverlaySettings(streamer: Streamer): OverlaySettings {
     visuals: streamer.visuals,
     theme: streamer.theme,
     rotation: streamer.rotation,
+    boards: streamer.boards,
+    pointsSuffix: streamer.pointsSuffix,
+    screenLayout: streamer.screenLayout,
+    rotationMode: streamer.rotationMode,
+    fontFamily: streamer.fontFamily,
+    labelAlignment: streamer.labelAlignment,
   };
 }
 
@@ -63,6 +81,12 @@ export type StreamerSettingsRow = Pick<
   | "visuals"
   | "theme"
   | "rotation"
+  | "boards"
+  | "points_suffix"
+  | "screen_layout"
+  | "rotation_mode"
+  | "font_family"
+  | "label_alignment"
 >;
 
 export function settingsToRow(
@@ -78,5 +102,11 @@ export function settingsToRow(
     visuals: settings.visuals,
     theme: settings.theme,
     rotation: settings.rotation,
+    boards: settings.boards,
+    points_suffix: settings.pointsSuffix,
+    screen_layout: settings.screenLayout,
+    rotation_mode: settings.rotationMode,
+    font_family: settings.fontFamily,
+    label_alignment: settings.labelAlignment,
   };
 }

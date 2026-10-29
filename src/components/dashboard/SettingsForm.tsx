@@ -3,14 +3,19 @@
 import { useState } from "react";
 import { ColorField } from "./controls/ColorField";
 import { NumberField } from "./controls/NumberField";
+import { Select } from "./controls/Select";
 import { Slider } from "./controls/Slider";
 import { Toggle } from "./controls/Toggle";
-import { applySettings, THEMES, type DeepPartial } from "@/lib/settings";
-import type {
-  OverlaySettings,
-  PointConfig,
-  ThemePreset,
-} from "@/lib/types";
+import {
+  applySettings,
+  BOARD_LABELS,
+  BOARD_SYMBOLS,
+  DEFAULT_BOARD_CONFIG,
+  DEFAULT_SETTINGS,
+  THEMES,
+  type DeepPartial,
+} from "@/lib/settings";
+import type { BoardConfig, BoardType, OverlaySettings, PointConfig, ThemePreset } from "@/lib/types";
 
 const POINT_FIELDS: { key: keyof PointConfig; label: string }[] = [
   { key: "tip", label: "Points per dollar" },
@@ -20,12 +25,40 @@ const POINT_FIELDS: { key: keyof PointConfig; label: string }[] = [
   { key: "raid", label: "Points per raider" },
 ];
 
-const COLOR_FIELDS: { key: string; label: string; theme: keyof (typeof THEMES)["midnight"] }[] = [
+const COLOR_FIELDS: { key: string; label: string; theme: keyof typeof THEMES.midnight }[] = [
   { key: "--lb-bg", label: "Background color", theme: "background" },
   { key: "--lb-text", label: "Text color", theme: "text" },
   { key: "--lb-accent", label: "Accent color", theme: "accent" },
   { key: "--lb-bar", label: "Bar track color", theme: "bar" },
   { key: "--lb-rank", label: "Rank color", theme: "accent" },
+];
+
+const SCREEN_LAYOUTS: { key: "single" | "side-by-side" | "stacked"; label: string }[] = [
+  { key: "single", label: "Single board" },
+  { key: "side-by-side", label: "Side by side" },
+  { key: "stacked", label: "Stacked" },
+];
+
+const ROTATION_MODES: { key: "boards" | "windows" | "both"; label: string }[] = [
+  { key: "boards", label: "Rotate boards" },
+  { key: "windows", label: "Rotate time windows" },
+  { key: "both", label: "Rotate boards & windows" },
+];
+
+const LABEL_ALIGNMENTS: { key: "left" | "center" | "right"; label: string }[] = [
+  { key: "left", label: "Left" },
+  { key: "center", label: "Center" },
+  { key: "right", label: "Right" },
+];
+
+const FONT_OPTIONS: { key: string; label: string }[] = [
+  { key: "system", label: "System font" },
+  { key: "Inter", label: "Inter" },
+  { key: "Roboto", label: "Roboto" },
+  { key: "Open Sans", label: "Open Sans" },
+  { key: "Lato", label: "Lato" },
+  { key: "Montserrat", label: "Montserrat" },
+  { key: "Poppins", label: "Poppins" },
 ];
 
 type Props = {
@@ -47,6 +80,75 @@ function Section({
       </h2>
       {children}
     </section>
+  );
+}
+
+function BoardSection({
+  board,
+  config,
+  onChange,
+}: {
+  board: BoardType;
+  config: BoardConfig;
+  onChange: (patch: { active?: boolean; windows?: string[]; rankCount?: number }) => void;
+}) {
+  const [localWindows, setLocalWindows] = useState<string[]>(config.windows);
+
+  const toggleWindow = (window: string) => {
+    const next = localWindows.includes(window)
+      ? localWindows.filter((w) => w !== window)
+      : [...localWindows, window];
+    setLocalWindows(next);
+    onChange({ windows: next });
+  };
+
+  return (
+    <div className="space-y-3 rounded-lg border border-slate-700/40 bg-slate-900/30 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <Toggle
+          id={`board-active-${board}`}
+          label={BOARD_LABELS[board]}
+          checked={config.active}
+          onChange={(active) => onChange({ active })}
+        />
+        <span className="text-xs font-mono text-slate-500">{BOARD_SYMBOLS[board]}</span>
+      </div>
+      {!config.active && (
+        <p className="text-xs text-slate-500 mt-1">
+          Board is disabled. Enable to show on overlay.
+        </p>
+      )}
+      {config.active && (
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+            Active windows
+          </label>
+          <div className="grid grid-cols-4 gap-1">
+            {["this_stream", "7d", "30d", "alltime"].map((window) => (
+              <button
+                key={window}
+                onClick={() => toggleWindow(window)}
+                className={`rounded border px-2 py-1 text-xs text-slate-300 transition-colors ${
+                  localWindows.includes(window)
+                    ? "border-indigo-400 bg-indigo-500/20 text-indigo-300"
+                    : "border-slate-700/60 bg-slate-950 hover:bg-slate-800/60"
+                }`}
+              >
+                {window === "this_stream" ? "This Stream" : window}
+              </button>
+            ))}
+          </div>
+          <NumberField
+            id={`board-rank-${board}`}
+            label="Max ranks"
+            value={config.rankCount}
+            min={1}
+            max={100}
+            onChange={(rankCount) => onChange({ rankCount })}
+          />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -159,36 +261,67 @@ export function SettingsForm({ initial, onChange }: Props) {
             className="w-full rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
           />
         </label>
+        <label
+          htmlFor="points-suffix"
+          className="block space-y-1 text-sm text-slate-200"
+        >
+          <span>Points suffix</span>
+          <input
+            id="points-suffix"
+            type="text"
+            value={settings.pointsSuffix}
+            onChange={(event) =>
+              update({ pointsSuffix: event.target.value.trim() || "pts" })
+            }
+            placeholder="pts"
+            className="w-full rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 py-2 font-mono text-xs text-slate-100 outline-none focus:border-indigo-400"
+          />
+        </label>
+      </Section>
+
+      <Section title="Board modes">
+        <p className="text-xs text-slate-500">
+          Enable the boards you want to show on the overlay. Disabled boards are
+          skipped during rotation.
+        </p>
+        <div className="space-y-2">
+          {Object.entries(settings.boards).map(([board, config]) => (
+            <BoardSection
+              key={board}
+              board={board as BoardType}
+              config={config as typeof DEFAULT_BOARD_CONFIG}
+              onChange={(patch) =>
+                update({
+                  boards: {
+                    ...settings.boards,
+                    [board]: { ...config, ...patch },
+                  },
+                })
+              }
+            />
+          ))}
+        </div>
       </Section>
 
       <Section title="Layout">
-        <Slider
-          id="layout-width"
-          label="Width"
-          value={settings.layout.width}
-          min={200}
-          max={800}
-          suffix="px"
-          onChange={(width) => update({ layout: { width } })}
-        />
-        <Slider
-          id="layout-padding"
-          label="Padding"
-          value={settings.layout.padding}
-          min={0}
-          max={48}
-          suffix="px"
-          onChange={(padding) => update({ layout: { padding } })}
-        />
-        <Slider
-          id="layout-radius"
-          label="Corner radius"
-          value={settings.layout.borderRadius}
-          min={0}
-          max={999}
-          suffix="px"
-          onChange={(borderRadius) => update({ layout: { borderRadius } })}
-        />
+        <label
+          htmlFor="screen-layout"
+          className="block space-y-1 text-sm text-slate-200"
+        >
+          <span>Screen layout</span>
+          <Select
+            id="screen-layout"
+            value={settings.screenLayout}
+            options={SCREEN_LAYOUTS}
+            onChange={(value) =>
+              update({ screenLayout: value as "single" | "side-by-side" | "stacked" })
+            }
+          />
+        </label>
+        <p className="text-xs text-slate-500">
+          Single shows one board at a time. Side by side and stacked show all
+          active boards simultaneously.
+        </p>
       </Section>
 
       <Section title="Visuals">
@@ -210,6 +343,32 @@ export function SettingsForm({ initial, onChange }: Props) {
           suffix="px"
           onChange={(fontSize) => update({ visuals: { fontSize } })}
         />
+        <label
+          htmlFor="font-family"
+          className="block space-y-1 text-sm text-slate-200"
+        >
+          <span>Font family</span>
+          <Select
+            id="font-family"
+            value={settings.fontFamily}
+            options={FONT_OPTIONS}
+            onChange={(value) => update({ fontFamily: value })}
+          />
+        </label>
+        <label
+          htmlFor="label-alignment"
+          className="block space-y-1 text-sm text-slate-200"
+        >
+          <span>Cycle label alignment</span>
+          <Select
+            id="label-alignment"
+            value={settings.labelAlignment}
+            options={LABEL_ALIGNMENTS}
+            onChange={(value) =>
+              update({ labelAlignment: value as "left" | "center" | "right" })
+            }
+          />
+        </label>
       </Section>
 
       <Section title="Theme">
@@ -249,10 +408,24 @@ export function SettingsForm({ initial, onChange }: Props) {
       <Section title="Rotation">
         <Toggle
           id="rotation-enabled"
-          label="Rotate windows"
+          label="Enable rotation"
           checked={settings.rotation.enabled}
           onChange={(enabled) => update({ rotation: { enabled } })}
         />
+        <label
+          htmlFor="rotation-mode"
+          className="block space-y-1 text-sm text-slate-200"
+        >
+          <span>Rotation mode</span>
+          <Select
+            id="rotation-mode"
+            value={settings.rotationMode}
+            options={ROTATION_MODES}
+            onChange={(value) =>
+              update({ rotationMode: value as "boards" | "windows" | "both" })
+            }
+          />
+        </label>
         <NumberField
           id="rotation-interval"
           label="Rotation interval (seconds)"
@@ -264,7 +437,7 @@ export function SettingsForm({ initial, onChange }: Props) {
           }
         />
         <p className="text-xs text-slate-500">
-          Cycles This Stream → 7 Days → 30 Days → All-Time.
+          Cycles through active boards and/or time windows based on rotation mode.
         </p>
       </Section>
     </div>

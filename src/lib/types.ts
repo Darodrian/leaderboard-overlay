@@ -2,6 +2,16 @@ export type WindowType = "this_stream" | "7d" | "30d" | "alltime";
 
 export type EventType = "tip" | "bit" | "sub" | "gift" | "raid";
 
+export type BoardType =
+  | "points"
+  | "donations"
+  | "bits"
+  | "subs"
+  | "raiders"
+  | "view_time"
+  | "chat_messages"
+  | "clips";
+
 export type ThemePreset = "midnight" | "ember" | "mint" | "grape" | "paper";
 
 export type PointConfig = {
@@ -41,6 +51,20 @@ export type RotationSettings = {
   intervalMs: number;
 };
 
+export type BoardConfig = {
+  active: boolean;
+  windows: WindowType[];
+  rankCount: number;
+};
+
+export type BoardConfigs = Partial<Record<BoardType, BoardConfig>>;
+
+export type ScreenLayout = "single" | "side-by-side" | "stacked";
+
+export type RotationMode = "boards" | "windows" | "both";
+
+export type LabelAlignment = "left" | "center" | "right";
+
 export type Streamer = {
   id: string;
   twitchUserId: string;
@@ -56,6 +80,12 @@ export type Streamer = {
   visuals: VisualSettings;
   theme: ThemeSettings;
   rotation: RotationSettings;
+  boards: BoardConfigs;
+  pointsSuffix: string;
+  screenLayout: ScreenLayout;
+  rotationMode: RotationMode;
+  fontFamily: string;
+  labelAlignment: LabelAlignment;
   createdAt: string;
 };
 
@@ -70,6 +100,12 @@ export type OverlaySettings = Pick<
   | "visuals"
   | "theme"
   | "rotation"
+  | "boards"
+  | "pointsSuffix"
+  | "screenLayout"
+  | "rotationMode"
+  | "fontFamily"
+  | "labelAlignment"
 >;
 
 export type License = {
@@ -111,18 +147,24 @@ export type PointEventInput = Omit<PointEvent, "id" | "createdAt"> & {
 export type LeaderboardRow = {
   userId: string;
   username: string;
-  points: number;
+  quantity: number;
   rank?: number;
   lastEventAt?: string;
+};
+
+export type BoardState = {
+  rows: LeaderboardRow[];
+  window: WindowType;
+  rankCount: number;
 };
 
 export type OverlayWindowMap = Record<WindowType, LeaderboardRow[]>;
 
 export type OverlayState = {
-  rows: LeaderboardRow[];
+  boards: Record<BoardType, BoardState>;
   settings: OverlaySettings;
-  window: WindowType;
-  windows?: OverlayWindowMap;
+  activeBoard: BoardType;
+  activeWindow: WindowType;
   /** A flush was skipped by the 2s throttle; the overlay should refetch soon. */
   pending?: boolean;
 };

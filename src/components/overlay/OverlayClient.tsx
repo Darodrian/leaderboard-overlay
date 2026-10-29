@@ -4,8 +4,8 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { Leaderboard } from "./Leaderboard";
 import { useLocalCache } from "@/hooks/useLocalCache";
 import { useOverlayRealtime } from "@/hooks/useOverlayRealtime";
-import { cssVars, nextRotationWindow } from "@/lib/settings";
-import type { OverlayState, WindowType } from "@/lib/types";
+import { cssVars, BOARD_LABELS, BOARD_SYMBOLS } from "@/lib/settings";
+import type { BoardType, OverlayState, ScreenLayout, WindowType } from "@/lib/types";
 
 const WINDOW_LABELS: Record<WindowType, string> = {
   this_stream: "This Stream",
@@ -26,12 +26,55 @@ export function OverlayClient({ token, initial }: Props) {
   );
   const live = useOverlayRealtime(token, cached);
   const state = live.hasLiveData ? live.state : cached;
+
+  // Read optional viewer ID from URL for view time tracking
+  const viewerId = typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("viewer") || undefined
+    : undefined;
+
+  // Heartbeat for view time tracking
+  useEffect(() => {
+    if (!viewerId) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        await fetch(`/api/overlay/${token}/heartbeat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ twitchUserId: viewerId, username: "Viewer" }),
+        });
+      } catch {
+        // Ignore heartbeat failures
+      }
+    };
+
+    sendHeartbeat();
+    const timer = setInterval(sendHeartbeat, 30000);
+    return () => clearInterval(timer);
+  }, [token, viewerId]);
+
+  const activeBoards = Object.entries(state.settings.boards).filter(
+    ([, cfg]) => cfg.active,
+  );
+  const boardTypes = activeBoards.map(([bt]) => bt as BoardType);
+
+  // For single layout with rotation, track which board/window is active
   const [rotation, setRotation] = useState<{
-    base: WindowType;
-    current: WindowType;
-  }>({ base: state.window, current: state.window });
-  const activeWindow =
-    rotation.base === state.window ? rotation.current : state.window;
+    currentBoard: BoardType;
+    currentWindow: WindowType;
+  }>({
+    currentBoard: state.activeBoard,
+    currentWindow: state.activeWindow,
+  });
+
+  const isSingle = state.settings.screenLayout === "single";
+  const activeBoard = isSingle ? rotation.currentBoard : boardTypes[0];
+  const activeWindow = isSingle ? rotation.currentWindow : state.activeWindow;
+
+  const boardState = state.boards[activeBoard];
+  const boardCfg = state.settings.boards[activeBoard];
+  const rankCount = boardCfg?.rankCount ?? 25;
+  const rows = boardState?.rows.slice(0, rankCount) ?? [];
 
   useEffect(() => {
     if (live.hasLiveData) setCached(live.state);
@@ -43,23 +86,84 @@ export function OverlayClient({ token, initial }: Props) {
   }, []);
 
   useEffect(() => {
-    if (!state.settings.rotation.enabled) return;
+    if (!state.settings.rotation.enabled || !isSingle) return;
     const id = window.setInterval(() => {
       setRotation((previous) => {
-        const base = state.window;
-        const current =
-          previous.base === base ? previous.current : state.window;
-        return { base, current: nextRotationWindow(current) };
+        const settings = state.settings;
+
+        let nextBoard = previous.currentBoard;
+        let nextWindow = previous.currentWindow;
+
+        if (settings.rotationMode === "boards" || settings.rotationMode === "both") {
+          const boardIndex = boardTypes.indexOf(previous.currentBoard);
+          const nextBoardIndex =
+            boardIndex === -1 || boardIndex === boardTypes.length - 1
+              ? 0
+              : boardIndex + 1;
+          nextBoard = boardTypes[nextBoardIndex];
+          nextWindow =
+            state.boards[nextBoard]?.window ?? previous.currentWindow;
+        }
+
+        if (settings.rotationMode === "windows" || settings.rotationMode === "both") {
+          if (settings.rotationMode === "windows") {
+            nextBoard = previous.currentBoard;
+          }
+          const boardWindows =
+            settings.boards[nextBoard]?.windows ?? ["this_stream"];
+          const windowIndex = boardWindows.indexOf(previous.currentWindow);
+          const nextWindowIndex =
+            windowIndex === -1 || windowIndex === boardWindows.length - 1
+              ? 0
+              : windowIndex + 1;
+          nextWindow = boardWindows[nextWindowIndex];
+        }
+
+        return {
+          currentBoard: nextBoard,
+          currentWindow: nextWindow,
+        };
       });
     }, state.settings.rotation.intervalMs);
     return () => window.clearInterval(id);
   }, [
     state.settings.rotation.enabled,
     state.settings.rotation.intervalMs,
-    state.window,
+    isSingle,
+    boardTypes,
+    state.activeBoard,
+    state.activeWindow,
+    state.settings.boards,
+    state.settings.rotationMode,
   ]);
 
-  const rows = state.windows?.[activeWindow] ?? state.rows;
+  const renderBoard = (board: BoardType, window: WindowType) => {
+    const bs = state.boards[board];
+    const bc = state.settings.boards[board];
+    const rc = bc?.rankCount ?? 25;
+    const boardRows = bs?.rows.slice(0, rc) ?? [];
+
+    return (
+      <div
+        key={board}
+        className="flex-1 min-w-0"
+      >
+        {state.settings.rotation.enabled && isSingle ? (
+          <div className="lb-window mb-1">
+            {BOARD_LABELS[board]} — {WINDOW_LABELS[window]}
+          </div>
+        ) : null}
+        {bs ? (
+          <Leaderboard
+            rows={boardRows}
+            board={board}
+            settings={state.settings}
+            window={window}
+          />
+        ) : null}
+      </div>
+    );
+  };
 
   return (
     <div
@@ -67,12 +171,21 @@ export function OverlayClient({ token, initial }: Props) {
       style={cssVars(state.settings) as unknown as CSSProperties}
       data-connection={live.connected ? "live" : "cached"}
     >
-      {state.settings.rotation.enabled ? (
-        <div className="lb-window">{WINDOW_LABELS[activeWindow]}</div>
-      ) : null}
-      <div className="lb-panel" key={activeWindow}>
-        <Leaderboard rows={rows} settings={state.settings} window={activeWindow} />
-      </div>
+      {state.settings.screenLayout === "side-by-side" && (
+        <div className="flex flex-col lg:flex-row gap-2">
+          {boardTypes.map((board) => renderBoard(board, state.activeWindow))}
+        </div>
+      )}
+      {state.settings.screenLayout === "stacked" && (
+        <div className="flex flex-col gap-2">
+          {boardTypes.map((board) => renderBoard(board, state.activeWindow))}
+        </div>
+      )}
+      {state.settings.screenLayout === "single" && (
+        <div className="lb-panel">
+          {boardState ? renderBoard(activeBoard, activeWindow) : null}
+        </div>
+      )}
     </div>
   );
 }

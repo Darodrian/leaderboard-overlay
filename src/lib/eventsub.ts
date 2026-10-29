@@ -160,3 +160,18 @@ export function parseEvent(
       return { kind: "ignore", reason: `unhandled subscription: ${subscriptionType}` };
   }
 }
+
+/**
+ * Parses a channel.clip.created EventSub notification into clip event data.
+ */
+export function parseClipEvent(
+  event: Record<string, unknown>,
+): { userId: string; username: string; clipId: string } | null {
+  const userId = toText(event.user_id);
+  const username = displayName(event);
+  const clipId = toText(event.id);
+
+  if (!userId || !username || !clipId) return null;
+
+  return { userId, username, clipId };
+}

@@ -23,6 +23,21 @@ const streamer: Streamer = {
   visuals: { opacity: 100, fontSize: 18 },
   theme: { preset: "midnight", overrides: {} },
   rotation: { enabled: false, intervalMs: 30000 },
+  boards: {
+    points: { active: true, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 25 },
+    donations: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+    bits: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+    subs: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+    raiders: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+    view_time: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+    chat_messages: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+    clips: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+  },
+  pointsSuffix: "pts",
+  screenLayout: "single",
+  rotationMode: "both",
+  fontFamily: "system",
+  labelAlignment: "center",
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 

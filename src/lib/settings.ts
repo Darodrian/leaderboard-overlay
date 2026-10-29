@@ -1,10 +1,31 @@
 import type {
+  BoardConfig,
+  BoardConfigs,
+  BoardType,
   DisplayToggles,
   OverlaySettings,
   PointConfig,
+  ScreenLayout,
   ThemePreset,
   WindowType,
 } from "./types";
+
+export const DEFAULT_BOARD_CONFIG: BoardConfig = {
+  active: false,
+  windows: ["this_stream", "7d", "30d", "alltime"],
+  rankCount: 25,
+};
+
+export const DEFAULT_BOARDS: BoardConfigs = {
+  points: { active: true, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 25 },
+  donations: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+  bits: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+  subs: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+  raiders: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+  view_time: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+  chat_messages: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+  clips: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
+};
 
 export const DEFAULT_SETTINGS: OverlaySettings = {
   pointConfig: { tip: 100, bit: 1, sub: 500, gift: 300, raid: 50 },
@@ -22,6 +43,12 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   visuals: { opacity: 100, fontSize: 18 },
   theme: { preset: "midnight", overrides: {} },
   rotation: { enabled: false, intervalMs: 30000 },
+  boards: DEFAULT_BOARDS,
+  pointsSuffix: "pts",
+  screenLayout: "single",
+  rotationMode: "both",
+  fontFamily: "system",
+  labelAlignment: "center",
 };
 
 export type DeepPartial<T> = {
@@ -85,10 +112,10 @@ function deepMerge<T>(base: T, patch: unknown): T {
     if (key === "__proto__" || key === "constructor" || key === "prototype") {
       continue;
     }
-    // Theme overrides are a complete map, not a nested config: replacing the
-    // whole object lets the dashboard clear a color back to the preset.
+    // Theme overrides and boards are complete maps: replacing the whole object
+    // lets the dashboard clear a color or reset a board back to defaults.
     result[key] =
-      key === "overrides"
+      key === "overrides" || key === "boards"
         ? value
         : isPlainObject(value) && isPlainObject(result[key])
           ? deepMerge(result[key], value)
@@ -137,6 +164,83 @@ function clampSettings(settings: OverlaySettings): OverlaySettings {
       : "";
   settings.anonymousMaskName = mask || "Anonymous";
 
+  const pointsSuffix =
+    typeof settings.pointsSuffix === "string" ? settings.pointsSuffix : "pts";
+  settings.pointsSuffix = pointsSuffix || "pts";
+
+  if (
+    settings.screenLayout !== "single" &&
+    settings.screenLayout !== "side-by-side" &&
+    settings.screenLayout !== "stacked"
+  ) {
+    settings.screenLayout = DEFAULT_SETTINGS.screenLayout;
+  }
+
+  if (
+    settings.rotationMode !== "boards" &&
+    settings.rotationMode !== "windows" &&
+    settings.rotationMode !== "both"
+  ) {
+    settings.rotationMode = DEFAULT_SETTINGS.rotationMode;
+  }
+
+  if (
+    settings.labelAlignment !== "left" &&
+    settings.labelAlignment !== "center" &&
+    settings.labelAlignment !== "right"
+  ) {
+    settings.labelAlignment = DEFAULT_SETTINGS.labelAlignment;
+  }
+
+  if (typeof settings.fontFamily !== "string" || settings.fontFamily.length === 0) {
+    settings.fontFamily = DEFAULT_SETTINGS.fontFamily;
+  }
+
+  // Clamp boards: validate each board config
+  const boards: Record<string, BoardConfig> = {};
+  const allBoardTypes: BoardType[] = [
+    "points",
+    "donations",
+    "bits",
+    "subs",
+    "raiders",
+    "view_time",
+    "chat_messages",
+    "clips",
+  ];
+
+  for (const boardType of allBoardTypes) {
+    const defaultBoard = DEFAULT_BOARDS[boardType] as BoardConfig;
+    let boardCfg: BoardConfig | undefined;
+    if (
+      settings.boards &&
+      typeof settings.boards === "object" &&
+      !Array.isArray(settings.boards)
+    ) {
+      boardCfg = (settings.boards as Record<string, BoardConfig | undefined>)[
+        boardType
+      ];
+    }
+
+    boards[boardType] = {
+      active: boardCfg?.active ?? defaultBoard.active,
+      windows: boardCfg?.windows &&
+        boardCfg.windows.length > 0 &&
+        boardCfg.windows.every((w) =>
+          ["this_stream", "7d", "30d", "alltime"].includes(w),
+        )
+        ? boardCfg.windows
+        : defaultBoard.windows,
+      rankCount:
+        typeof boardCfg?.rankCount === "number" &&
+        boardCfg.rankCount >= 1 &&
+        boardCfg.rankCount <= 100
+          ? boardCfg.rankCount
+          : defaultBoard.rankCount,
+    };
+  }
+  settings.boards = boards as BoardConfigs;
+
   const overrides: Record<string, string> = {};
   if (isPlainObject(settings.theme.overrides)) {
     for (const [key, value] of Object.entries(settings.theme.overrides)) {
@@ -177,6 +281,9 @@ export function cssVars(settings: OverlaySettings): Record<string, string> {
     "--lb-radius": `${settings.layout.borderRadius}px`,
     "--lb-opacity": `${settings.visuals.opacity / 100}`,
     "--lb-font-size": `${settings.visuals.fontSize}px`,
+    "--lb-font-family": settings.fontFamily,
+    "--lb-label-align": settings.labelAlignment,
+    "--lb-points-suffix": settings.pointsSuffix,
     ...settings.theme.overrides,
   };
 }
@@ -192,3 +299,25 @@ export function nextRotationWindow(
   if (index === -1) return order[0];
   return order[(index + 1) % order.length];
 }
+
+export const BOARD_SYMBOLS: Record<BoardType, string> = {
+  points: "pts",
+  donations: "$",
+  bits: "bit",
+  subs: "sub",
+  raiders: "raid",
+  view_time: "⏱",
+  chat_messages: "💬",
+  clips: "🎥",
+};
+
+export const BOARD_LABELS: Record<BoardType, string> = {
+  points: "Points",
+  donations: "Donations",
+  bits: "Bits",
+  subs: "Subs",
+  raiders: "Raiders",
+  view_time: "View Time",
+  chat_messages: "Chat",
+  clips: "Clips",
+};

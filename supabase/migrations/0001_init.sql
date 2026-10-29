@@ -20,11 +20,24 @@ create table if not exists streamers (
   visuals jsonb not null default '{"opacity":100,"fontSize":18}'::jsonb,
   theme jsonb not null default '{"preset":"midnight","overrides":{}}'::jsonb,
   rotation jsonb not null default '{"enabled":false,"intervalMs":30000}'::jsonb,
+  boards jsonb not null default '{"points":{"active":true,"windows":["this_stream","7d","30d","alltime"],"rankCount":25}}'::jsonb,
   last_flush_at timestamptz,
   flush_pending boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- For existing tables created without the boards column, add it.
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'streamers' and column_name = 'boards'
+  ) then
+    alter table streamers
+      add column boards jsonb not null default '{"points":{"active":true,"windows":["this_stream","7d","30d","alltime"],"rankCount":25}}'::jsonb;
+  end if;
+end $$;
 
 create table if not exists licenses (
   key text primary key,
@@ -80,15 +93,49 @@ create table if not exists leaderboard_aggregates (
   streamer_id uuid not null references streamers(id) on delete cascade,
   window_type text not null
     check (window_type in ('this_stream', '7d', '30d', 'alltime')),
+  board_type text not null
+    check (board_type in ('points','donations','bits','subs','raiders','view_time','chat_messages','clips')),
   user_id text not null,
   username text not null,
-  points integer not null default 0 check (points >= 0),
+  quantity integer not null default 0 check (quantity >= 0),
   last_event_at timestamptz not null default now(),
-  primary key (streamer_id, window_type, user_id)
+  primary key (streamer_id, window_type, board_type, user_id)
 );
 
-create index if not exists idx_aggregates_streamer_window
-  on leaderboard_aggregates (streamer_id, window_type);
+-- For existing tables created without board_type, add the column
+-- and recreate the primary key to include it BEFORE creating the index.
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'leaderboard_aggregates' and column_name = 'board_type'
+  ) then
+    alter table leaderboard_aggregates
+      add column board_type text not null default 'points'
+        check (board_type in ('points','donations','bits','subs','raiders','view_time','chat_messages','clips'));
+  end if;
+end $$;
+
+do $$
+declare
+  has_board_type_in_pk boolean;
+begin
+  select count(*) > 0 into has_board_type_in_pk
+  from information_schema.table_constraints tc
+  join information_schema.constraint_column_usage ccu on tc.constraint_name = ccu.constraint_name
+  where tc.table_name = 'leaderboard_aggregates'
+    and tc.constraint_type = 'PRIMARY KEY'
+    and ccu.column_name = 'board_type';
+
+  if not has_board_type_in_pk then
+    alter table leaderboard_aggregates drop constraint if exists leaderboard_aggregates_pkey;
+    alter table leaderboard_aggregates
+      add primary key (streamer_id, window_type, board_type, user_id);
+  end if;
+end $$;
+
+create index if not exists idx_aggregates_streamer_window_board
+  on leaderboard_aggregates (streamer_id, window_type, board_type);
 
 -- Row Level Security: deny by default.
 alter table streamers enable row level security;
@@ -97,6 +144,45 @@ alter table overlay_sessions enable row level security;
 alter table point_events enable row level security;
 alter table stream_windows enable row level security;
 alter table leaderboard_aggregates enable row level security;
+
+create table if not exists view_sessions (
+  id uuid primary key default gen_random_uuid(),
+  streamer_id uuid not null references streamers(id) on delete cascade,
+  twitch_user_id text not null,
+  username text not null,
+  started_at timestamptz not null default now(),
+  ended_at timestamptz,
+  duration_seconds integer not null default 0 check (duration_seconds >= 0)
+);
+
+create index if not exists idx_view_sessions_streamer_user
+  on view_sessions (streamer_id, twitch_user_id);
+
+create table if not exists chat_events (
+  id uuid primary key default gen_random_uuid(),
+  streamer_id uuid not null references streamers(id) on delete cascade,
+  twitch_user_id text not null,
+  username text not null,
+  is_bot boolean not null default false,
+  is_broadcaster boolean not null default false,
+  is_mod boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_chat_events_streamer_created
+  on chat_events (streamer_id, created_at desc);
+
+create table if not exists clip_events (
+  id uuid primary key default gen_random_uuid(),
+  streamer_id uuid not null references streamers(id) on delete cascade,
+  twitch_user_id text not null,
+  username text not null,
+  clip_id text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_clip_events_streamer_created
+  on clip_events (streamer_id, created_at desc);
 
 -- Dashboard server routes use the service role, which bypasses RLS.
 -- These policies are defense-in-depth for a future Supabase-Auth session
@@ -135,14 +221,28 @@ drop policy if exists leaderboard_aggregates_self on leaderboard_aggregates;
 create policy leaderboard_aggregates_self on leaderboard_aggregates
   for select using (streamer_id = auth.uid());
 
--- Recompute every window for one streamer. Idempotent; serialised per streamer.
+drop policy if exists view_sessions_self on view_sessions;
+create policy view_sessions_self on view_sessions
+  for all using (streamer_id = auth.uid()) with check (streamer_id = auth.uid());
+
+drop policy if exists chat_events_self on chat_events;
+create policy chat_events_self on chat_events
+  for all using (streamer_id = auth.uid()) with check (streamer_id = auth.uid());
+
+drop policy if exists clip_events_self on clip_events;
+create policy clip_events_self on clip_events
+  for all using (streamer_id = auth.uid()) with check (streamer_id = auth.uid());
+
+-- Recompute aggregates for one streamer. Idempotent; serialised per streamer.
 -- At most one recompute per two seconds unless p_force is true: a skipped call
 -- marks the streamer as pending so the next read can drain it.
-drop function if exists public.flush_streamer_aggregates(uuid);
+-- When p_board_type is null, recomputes all board types; otherwise only that one.
+drop function if exists public.flush_streamer_aggregates(uuid, boolean, text);
 
 create or replace function flush_streamer_aggregates(
   p_streamer_id uuid,
-  p_force boolean default false
+  p_force boolean default false,
+  p_board_type text default null
 )
 returns boolean
 language plpgsql
@@ -150,9 +250,11 @@ security definer
 set search_path = public
 as $$
 declare
+  v_board text;
   v_window text;
   v_since timestamptz;
   v_last timestamptz;
+  v_boards text[] := array['points','donations','bits','subs','raiders','view_time','chat_messages','clips'];
 begin
   perform pg_advisory_xact_lock(hashtext(p_streamer_id::text));
 
@@ -170,38 +272,165 @@ begin
     set last_flush_at = now(), flush_pending = false
     where id = p_streamer_id;
 
-  foreach v_window in array array['this_stream', '7d', '30d', 'alltime']
+  foreach v_board in array v_boards
   loop
-    v_since := case v_window
-      when 'this_stream' then coalesce(
-        (select started_at from stream_windows
+    if p_board_type is not null and v_board <> p_board_type then
+      continue;
+    end if;
+
+    foreach v_window in array array['this_stream', '7d', '30d', 'alltime']
+    loop
+      v_since := case v_window
+        when 'this_stream' then coalesce(
+          (select started_at from stream_windows
+            where streamer_id = p_streamer_id
+              and window_type = 'this_stream'
+              and is_active
+            order by started_at desc
+            limit 1),
+          '-infinity'::timestamptz)
+        when '7d' then now() - interval '7 days'
+        when '30d' then now() - interval '30 days'
+        else '-infinity'::timestamptz
+      end;
+
+      delete from leaderboard_aggregates
+        where streamer_id = p_streamer_id and window_type = v_window and board_type = v_board;
+
+      case v_board
+        when 'points' then
+          insert into leaderboard_aggregates
+            (streamer_id, window_type, board_type, user_id, username, quantity, last_event_at)
+          select
+            p_streamer_id,
+            v_window,
+            v_board,
+            credited_user_id,
+            (array_agg(credited_username order by is_anonymous desc, created_at desc))[1],
+            sum(points_awarded)::integer,
+            max(created_at)
+          from point_events
           where streamer_id = p_streamer_id
-            and window_type = 'this_stream'
-            and is_active
-          order by started_at desc
-          limit 1),
-        '-infinity'::timestamptz)
-      when '7d' then now() - interval '7 days'
-      when '30d' then now() - interval '30 days'
-      else '-infinity'::timestamptz
-    end;
+            and created_at >= v_since
+          group by credited_user_id;
 
-    delete from leaderboard_aggregates
-      where streamer_id = p_streamer_id and window_type = v_window;
+        when 'donations' then
+          insert into leaderboard_aggregates
+            (streamer_id, window_type, board_type, user_id, username, quantity, last_event_at)
+          select
+            p_streamer_id,
+            v_window,
+            v_board,
+            credited_user_id,
+            (array_agg(credited_username order by is_anonymous desc, created_at desc))[1],
+            sum(amount_cents)::integer / 100,
+            max(created_at)
+          from point_events
+          where streamer_id = p_streamer_id
+            and event_type = 'tip'
+            and created_at >= v_since
+          group by credited_user_id;
 
-    insert into leaderboard_aggregates
-      (streamer_id, window_type, user_id, username, points, last_event_at)
-    select
-      p_streamer_id,
-      v_window,
-      credited_user_id,
-      (array_agg(credited_username order by is_anonymous desc, created_at desc))[1],
-      sum(points_awarded)::integer,
-      max(created_at)
-    from point_events
-    where streamer_id = p_streamer_id
-      and created_at >= v_since
-    group by credited_user_id;
+        when 'bits' then
+          insert into leaderboard_aggregates
+            (streamer_id, window_type, board_type, user_id, username, quantity, last_event_at)
+          select
+            p_streamer_id,
+            v_window,
+            v_board,
+            credited_user_id,
+            (array_agg(credited_username order by is_anonymous desc, created_at desc))[1],
+            sum(amount_cents)::integer,
+            max(created_at)
+          from point_events
+          where streamer_id = p_streamer_id
+            and event_type = 'bit'
+            and created_at >= v_since
+          group by credited_user_id;
+
+        when 'subs' then
+          insert into leaderboard_aggregates
+            (streamer_id, window_type, board_type, user_id, username, quantity, last_event_at)
+          select
+            p_streamer_id,
+            v_window,
+            v_board,
+            credited_user_id,
+            (array_agg(credited_username order by is_anonymous desc, created_at desc))[1],
+            count(*)::integer,
+            max(created_at)
+          from point_events
+          where streamer_id = p_streamer_id
+            and event_type = 'sub'
+            and created_at >= v_since
+          group by credited_user_id;
+
+        when 'raiders' then
+          insert into leaderboard_aggregates
+            (streamer_id, window_type, board_type, user_id, username, quantity, last_event_at)
+          select
+            p_streamer_id,
+            v_window,
+            v_board,
+            credited_user_id,
+            (array_agg(credited_username order by is_anonymous desc, created_at desc))[1],
+            sum(amount_cents)::integer,
+            max(created_at)
+          from point_events
+          where streamer_id = p_streamer_id
+            and event_type = 'raid'
+            and created_at >= v_since
+          group by credited_user_id;
+
+        when 'view_time' then
+          insert into leaderboard_aggregates
+            (streamer_id, window_type, board_type, user_id, username, quantity, last_event_at)
+          select
+            p_streamer_id,
+            v_window,
+            v_board,
+            vs.twitch_user_id,
+            max(vs.username),
+            sum(vs.duration_seconds)::integer,
+            max(vs.ended_at)
+          from view_sessions vs
+          where vs.streamer_id = p_streamer_id
+            and vs.created_at >= v_since
+          group by vs.twitch_user_id;
+
+        when 'chat_messages' then
+          insert into leaderboard_aggregates
+            (streamer_id, window_type, board_type, user_id, username, quantity, last_event_at)
+          select
+            p_streamer_id,
+            v_window,
+            v_board,
+            ce.twitch_user_id,
+            max(ce.username),
+            count(*)::integer,
+            max(ce.created_at)
+          from chat_events ce
+          where ce.streamer_id = p_streamer_id
+            and ce.created_at >= v_since
+          group by ce.twitch_user_id;
+
+        when 'clips' then
+          insert into leaderboard_aggregates
+            (streamer_id, window_type, board_type, user_id, username, quantity, last_event_at)
+          select
+            p_streamer_id,
+            v_window,
+            v_board,
+            cl.twitch_user_id,
+            max(cl.username),
+            count(*)::integer,
+            max(cl.created_at)
+          from clip_events cl
+          where cl.streamer_id = p_streamer_id
+            and cl.created_at >= v_since
+          group by cl.twitch_user_id;
+      end case;
+    end loop;
   end loop;
 
   return true;
@@ -210,7 +439,7 @@ $$;
 
 -- The anon key ships to browsers, so the recompute function must not be
 -- callable by anon/authenticated clients. Server routes use the service role.
-revoke all on function public.flush_streamer_aggregates(uuid, boolean)
+revoke all on function public.flush_streamer_aggregates(uuid, boolean, text)
   from public, anon, authenticated;
-grant execute on function public.flush_streamer_aggregates(uuid, boolean)
+grant execute on function public.flush_streamer_aggregates(uuid, boolean, text)
   to service_role;

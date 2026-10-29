@@ -2,7 +2,8 @@
  * Twitch chat command bot.
  *
  * Runs as a long-lived process (not on Vercel). Connects to Twitch IRC over
- * WebSocket, reads mod/broadcaster commands, and posts them to the app.
+ * WebSocket, reads mod/broadcaster commands, counts chat messages, and posts
+ * them to the app.
  *
  * Required env:
  *   TWITCH_CHAT_BOT_TOKEN   oauth token for the bot account (with or without "oauth:")
@@ -72,9 +73,41 @@ function parsePrivmsg(line: string): ChatMessage | null {
   };
 }
 
+async function postChatEvent(message: ChatMessage): Promise<void> {
+  try {
+    const response = await fetch(
+      `${APP_URL}/api/webhooks/chat/${OVERLAY_TOKEN}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-chat-bot-secret": BOT_SECRET ?? "",
+        },
+        body: JSON.stringify({
+          userId: message.userId,
+          username: message.badges["display-name"] || "Viewer",
+          isBot: message.badges.bot === "1",
+          isBroadcaster: message.badges.broadcaster === "1",
+          isMod: message.badges.mod === "1",
+        }),
+      },
+    );
+    if (!response.ok) {
+      console.warn(
+        `[chat-bot] chat event rejected with status ${response.status}`,
+      );
+    }
+  } catch (error) {
+    console.error("[chat-bot] chat event request failed", error);
+  }
+}
+
 async function handleLine(line: string): Promise<void> {
   const message = parsePrivmsg(line);
   if (!message) return;
+
+  // Count every chat message for the chat_messages board
+  await postChatEvent(message);
 
   const parsed = parseChatCommand(message.text);
   if (!parsed) return;

@@ -31,7 +31,7 @@ body {
   font-size: var(--lb-font-size, 18px);
   opacity: var(--lb-opacity, 1);
   color: var(--lb-text, #e6edf3);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--lb-font-family, Arial, Helvetica, sans-serif);
 }
 
 .lb-panel {
@@ -41,12 +41,54 @@ body {
   animation: lb-fade 400ms ease;
 }
 
+/* Multi-board layouts */
+.lb-layout-side-by-side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lb-padding, 12px);
+}
+
+@media (min-width: 1024px) {
+  .lb-layout-side-by-side {
+    flex-direction: row;
+  }
+}
+
+.lb-layout-stacked {
+  display: flex;
+  flex-direction: column;
+  gap: var(--lb-padding, 12px);
+}
+
+.lb-board-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.lb-board-symbol {
+  font-size: 0.85em;
+  color: var(--lb-accent, #7c9cff);
+}
+
+.lb-board-label {
+  font-size: 0.75em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lb-text, #e6edf3);
+  opacity: 0.8;
+}
+
 .lb-window {
   font-size: 0.7em;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--lb-accent, #7c9cff);
   margin-bottom: 8px;
+  text-align: var(--lb-label-align, center);
 }
 
 .lb-list {
@@ -83,7 +125,7 @@ body {
   white-space: nowrap;
 }
 
-.lb-points {
+.lb-quantity {
   color: var(--lb-accent, #7c9cff);
   font-variant-numeric: tabular-nums;
 }
