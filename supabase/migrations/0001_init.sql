@@ -39,6 +39,106 @@ begin
   end if;
 end $$;
 
+-- Add remaining new streamers settings columns if missing
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'streamers' and column_name = 'points_suffix'
+  ) then
+    alter table streamers
+      add column points_suffix text not null default 'pts';
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'streamers' and column_name = 'screen_layout'
+  ) then
+    alter table streamers
+      add column screen_layout text not null default 'single';
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'streamers' and column_name = 'rotation_mode'
+  ) then
+    alter table streamers
+      add column rotation_mode text not null default 'both';
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'streamers' and column_name = 'font_family'
+  ) then
+    alter table streamers
+      add column font_family text not null default 'system';
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'streamers' and column_name = 'label_alignment'
+  ) then
+    alter table streamers
+      add column label_alignment text not null default 'center';
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'streamers' and column_name = 'exclude_broadcaster_from_view_time'
+  ) then
+    alter table streamers
+      add column exclude_broadcaster_from_view_time boolean not null default false;
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'streamers' and column_name = 'exclude_mods_from_view_time'
+  ) then
+    alter table streamers
+      add column exclude_mods_from_view_time boolean not null default false;
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'streamers' and column_name = 'exclude_broadcaster_from_chat_messages'
+  ) then
+    alter table streamers
+      add column exclude_broadcaster_from_chat_messages boolean not null default false;
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'streamers' and column_name = 'exclude_mods_from_chat_messages'
+  ) then
+    alter table streamers
+      add column exclude_mods_from_chat_messages boolean not null default false;
+  end if;
+end $$;
+
 create table if not exists licenses (
   key text primary key,
   twitch_user_id text,
@@ -113,6 +213,17 @@ begin
     alter table leaderboard_aggregates
       add column board_type text not null default 'points'
         check (board_type in ('points','donations','bits','subs','raiders','view_time','chat_messages','clips'));
+  end if;
+end $$;
+
+-- Rename old 'points' column to 'quantity' if it still exists
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_name = 'leaderboard_aggregates' and column_name = 'points'
+  ) then
+    alter table leaderboard_aggregates rename column points to quantity;
   end if;
 end $$;
 
@@ -392,10 +503,10 @@ begin
             vs.twitch_user_id,
             max(vs.username),
             sum(vs.duration_seconds)::integer,
-            max(vs.ended_at)
+            max(vs.started_at)
           from view_sessions vs
           where vs.streamer_id = p_streamer_id
-            and vs.created_at >= v_since
+            and vs.started_at >= v_since
           group by vs.twitch_user_id;
 
         when 'chat_messages' then

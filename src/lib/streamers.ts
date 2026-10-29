@@ -21,6 +21,10 @@ export type StreamerRow = {
   rotation_mode: string;
   font_family: string;
   label_alignment: string;
+  exclude_broadcaster_from_view_time: boolean;
+  exclude_mods_from_view_time: boolean;
+  exclude_broadcaster_from_chat_messages: boolean;
+  exclude_mods_from_chat_messages: boolean;
   created_at: string;
 };
 
@@ -46,6 +50,10 @@ export function mapStreamerRow(row: StreamerRow): Streamer {
     rotationMode: row.rotation_mode as RotationMode,
     fontFamily: row.font_family,
     labelAlignment: row.label_alignment as LabelAlignment,
+    excludeBroadcasterFromViewTime: row.exclude_broadcaster_from_view_time,
+    excludeModsFromViewTime: row.exclude_mods_from_view_time,
+    excludeBroadcasterFromChatMessages: row.exclude_broadcaster_from_chat_messages,
+    excludeModsFromChatMessages: row.exclude_mods_from_chat_messages,
     createdAt: row.created_at,
   };
 }
@@ -67,6 +75,10 @@ export function toOverlaySettings(streamer: Streamer): OverlaySettings {
     rotationMode: streamer.rotationMode,
     fontFamily: streamer.fontFamily,
     labelAlignment: streamer.labelAlignment,
+    excludeBroadcasterFromViewTime: streamer.excludeBroadcasterFromViewTime,
+    excludeModsFromViewTime: streamer.excludeModsFromViewTime,
+    excludeBroadcasterFromChatMessages: streamer.excludeBroadcasterFromChatMessages,
+    excludeModsFromChatMessages: streamer.excludeModsFromChatMessages,
   };
 }
 
@@ -87,6 +99,10 @@ export type StreamerSettingsRow = Pick<
   | "rotation_mode"
   | "font_family"
   | "label_alignment"
+  | "exclude_broadcaster_from_view_time"
+  | "exclude_mods_from_view_time"
+  | "exclude_broadcaster_from_chat_messages"
+  | "exclude_mods_from_chat_messages"
 >;
 
 export function settingsToRow(
@@ -108,5 +124,9 @@ export function settingsToRow(
     rotation_mode: settings.rotationMode,
     font_family: settings.fontFamily,
     label_alignment: settings.labelAlignment,
+    exclude_broadcaster_from_view_time: settings.excludeBroadcasterFromViewTime,
+    exclude_mods_from_view_time: settings.excludeModsFromViewTime,
+    exclude_broadcaster_from_chat_messages: settings.excludeBroadcasterFromChatMessages,
+    exclude_mods_from_chat_messages: settings.excludeModsFromChatMessages,
   };
 }

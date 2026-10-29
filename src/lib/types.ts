@@ -86,6 +86,10 @@ export type Streamer = {
   rotationMode: RotationMode;
   fontFamily: string;
   labelAlignment: LabelAlignment;
+  excludeBroadcasterFromViewTime: boolean;
+  excludeModsFromViewTime: boolean;
+  excludeBroadcasterFromChatMessages: boolean;
+  excludeModsFromChatMessages: boolean;
   createdAt: string;
 };
 
@@ -106,6 +110,10 @@ export type OverlaySettings = Pick<
   | "rotationMode"
   | "fontFamily"
   | "labelAlignment"
+  | "excludeBroadcasterFromViewTime"
+  | "excludeModsFromViewTime"
+  | "excludeBroadcasterFromChatMessages"
+  | "excludeModsFromChatMessages"
 >;
 
 export type License = {

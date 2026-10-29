@@ -27,8 +27,18 @@ export const DEFAULT_BOARDS: BoardConfigs = {
   clips: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
 };
 
-export const DEFAULT_SETTINGS: OverlaySettings = {
-  pointConfig: { tip: 100, bit: 1, sub: 500, gift: 300, raid: 50 },
+export const ALL_BOARD_TYPES: BoardType[] = [
+  "points",
+  "donations",
+  "bits",
+  "subs",
+  "raiders",
+  "view_time",
+  "chat_messages",
+  "clips",
+];
+
+export const DEFAULT_SETTINGS: OverlaySettings = {  pointConfig: { tip: 100, bit: 1, sub: 500, gift: 300, raid: 50 },
   tipThresholdCents: 0,
   anonymousMaskName: "Mystery Supporter",
   display: {
@@ -49,6 +59,10 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   rotationMode: "both",
   fontFamily: "system",
   labelAlignment: "center",
+  excludeBroadcasterFromViewTime: false,
+  excludeModsFromViewTime: false,
+  excludeBroadcasterFromChatMessages: false,
+  excludeModsFromChatMessages: false,
 };
 
 export type DeepPartial<T> = {
@@ -155,6 +169,19 @@ function clampSettings(settings: OverlaySettings): OverlaySettings {
   for (const key of Object.keys(DEFAULT_SETTINGS.display) as (keyof DisplayToggles)[]) {
     if (typeof unknownDisplay[key] !== "boolean") {
       settings.display[key] = DEFAULT_SETTINGS.display[key];
+    }
+  }
+
+  // Coerce new boolean toggles
+  const boolDefaults = {
+    excludeBroadcasterFromViewTime: DEFAULT_SETTINGS.excludeBroadcasterFromViewTime,
+    excludeModsFromViewTime: DEFAULT_SETTINGS.excludeModsFromViewTime,
+    excludeBroadcasterFromChatMessages: DEFAULT_SETTINGS.excludeBroadcasterFromChatMessages,
+    excludeModsFromChatMessages: DEFAULT_SETTINGS.excludeModsFromChatMessages,
+  } as const;
+  for (const [key, defaultValue] of Object.entries(boolDefaults)) {
+    if (typeof (settings as unknown as Record<string, unknown>)[key] !== "boolean") {
+      (settings as unknown as Record<string, unknown>)[key] = defaultValue;
     }
   }
 

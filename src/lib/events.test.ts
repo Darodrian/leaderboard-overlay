@@ -38,6 +38,10 @@ const streamer: Streamer = {
   rotationMode: "both",
   fontFamily: "system",
   labelAlignment: "center",
+  excludeBroadcasterFromViewTime: false,
+  excludeModsFromViewTime: false,
+  excludeBroadcasterFromChatMessages: false,
+  excludeModsFromChatMessages: false,
   createdAt: "2026-01-01T00:00:00.000Z",
 };
 

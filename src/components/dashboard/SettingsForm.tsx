@@ -8,6 +8,7 @@ import { Slider } from "./controls/Slider";
 import { Toggle } from "./controls/Toggle";
 import {
   applySettings,
+  ALL_BOARD_TYPES,
   BOARD_LABELS,
   BOARD_SYMBOLS,
   DEFAULT_BOARD_CONFIG,
@@ -285,21 +286,61 @@ export function SettingsForm({ initial, onChange }: Props) {
           skipped during rotation.
         </p>
         <div className="space-y-2">
-          {Object.entries(settings.boards).map(([board, config]) => (
-            <BoardSection
-              key={board}
-              board={board as BoardType}
-              config={config as typeof DEFAULT_BOARD_CONFIG}
-              onChange={(patch) =>
-                update({
-                  boards: {
-                    ...settings.boards,
-                    [board]: { ...config, ...patch },
-                  },
-                })
+          {ALL_BOARD_TYPES.map((board) => {
+            const config = settings.boards[board] ?? DEFAULT_BOARD_CONFIG;
+            return (
+              <BoardSection
+                key={board}
+                board={board}
+                config={config}
+                onChange={(patch) =>
+                  update({
+                    boards: {
+                      ...settings.boards,
+                      [board]: { ...config, ...patch },
+                    },
+                  })
+                }
+              />
+            );
+          })}
+          <div className="space-y-3 rounded-lg border border-slate-700/40 bg-slate-900/30 p-3">
+            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+              Exclusion options
+            </h3>
+            <Toggle
+              id="exclude-broadcaster-view-time"
+              label="Exclude broadcaster from view time"
+              checked={settings.excludeBroadcasterFromViewTime}
+              onChange={(excluded) =>
+                update({ excludeBroadcasterFromViewTime: excluded })
               }
             />
-          ))}
+            <Toggle
+              id="exclude-mods-view-time"
+              label="Exclude mods from view time"
+              checked={settings.excludeModsFromViewTime}
+              onChange={(excluded) =>
+                update({ excludeModsFromViewTime: excluded })
+              }
+            />
+            <Toggle
+              id="exclude-broadcaster-chat"
+              label="Exclude broadcaster from chat messages"
+              checked={settings.excludeBroadcasterFromChatMessages}
+              onChange={(excluded) =>
+                update({ excludeBroadcasterFromChatMessages: excluded })
+              }
+            />
+            <Toggle
+              id="exclude-mods-chat"
+              label="Exclude mods from chat messages"
+              checked={settings.excludeModsFromChatMessages}
+              onChange={(excluded) =>
+                update({ excludeModsFromChatMessages: excluded })
+              }
+            />
+          </div>
         </div>
       </Section>
 
