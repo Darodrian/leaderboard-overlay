@@ -24,3 +24,95 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* OBS overlay */
+.lb-root {
+  width: var(--lb-width, 420px);
+  font-size: var(--lb-font-size, 18px);
+  opacity: var(--lb-opacity, 1);
+  color: var(--lb-text, #e6edf3);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.lb-panel {
+  background: var(--lb-bg, #0b1020);
+  border-radius: var(--lb-radius, 16px);
+  padding: var(--lb-padding, 12px);
+  animation: lb-fade 400ms ease;
+}
+
+.lb-window {
+  font-size: 0.7em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lb-accent, #7c9cff);
+  margin-bottom: 8px;
+}
+
+.lb-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--lb-padding, 12px) / 2);
+}
+
+.lb-row {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  padding-bottom: 4px;
+}
+
+.lb-medal {
+  width: 1.4em;
+  text-align: center;
+}
+
+.lb-rank {
+  color: var(--lb-accent, #7c9cff);
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lb-points {
+  color: var(--lb-accent, #7c9cff);
+  font-variant-numeric: tabular-nums;
+}
+
+.lb-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: var(--lb-bar, #2a3a6a);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.lb-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--lb-accent, #7c9cff);
+  transition: width 400ms ease;
+}
+
+@keyframes lb-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

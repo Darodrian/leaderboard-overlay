@@ -115,3 +115,12 @@ export type LeaderboardRow = {
   rank?: number;
   lastEventAt?: string;
 };
+
+export type OverlayWindowMap = Record<WindowType, LeaderboardRow[]>;
+
+export type OverlayState = {
+  rows: LeaderboardRow[];
+  settings: OverlaySettings;
+  window: WindowType;
+  windows?: OverlayWindowMap;
+};
