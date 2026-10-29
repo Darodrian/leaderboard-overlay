@@ -1,36 +1,125 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Twitch Leaderboard Overlay
 
-## Getting Started
+A no-code Twitch leaderboard overlay sold as a hosted product. Streamers sign in
+with Twitch, bind a license key, configure everything from a dashboard, and paste
+one secure URL into OBS.
 
-First, run the development server:
+- **Dashboard:** license binding, OBS URL, token regeneration, all overlay settings.
+- **Overlay:** realtime leaderboard with themes, rotation, and an offline cache.
+- **Ingestion:** Twitch EventSub webhooks plus a tip bridge endpoint.
+- **Hosting:** Vercel + Supabase only. No customer infrastructure.
 
-```bash
+## Stack
+
+| Layer | Choice |
+|------|--------|
+| App | Next.js 16 App Router, React 19, TypeScript strict |
+| Styling | Tailwind CSS v4 |
+| Data | Supabase Postgres + Realtime |
+| Events | Twitch EventSub (Edge webhook), Twitch OAuth |
+| Tests | Vitest, Testing Library (jsdom) |
+
+## Local development
+
+```powershell
+npm install
+Copy-Item .env.example .env.local   # fill in the values
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Apply `supabase/migrations/0001_init.sql` in the Supabase SQL editor before the
+first login. Full setup (Supabase, Twitch app, EventSub, Vercel) is in
+[`docs/VERCEL_SETUP.md`](docs/VERCEL_SETUP.md).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Scripts
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Next.js dev server |
+| `npm run build` | Production build |
+| `npm test` | Unit/component tests |
+| `npm run test:watch` | Watch mode |
+| `npm run lint` | ESLint |
+| `npm run chat-bot` | Long-running Twitch chat command bot |
 
-## Learn More
+## Routes
 
-To learn more about Next.js, take a look at the following resources:
+| Route | Purpose |
+|-------|---------|
+| `/` | Landing + Twitch sign-in |
+| `/dashboard` | License binding, OBS URL, token regeneration |
+| `/dashboard/settings` | Display, points, layout, visuals, theme, rotation |
+| `/overlay/[token]` | OBS browser source (token-gated) |
+| `GET /api/overlay/[token]/data` | Overlay snapshot used for refresh |
+| `POST /api/overlay/[token]/command` | Chat bot commands (shared secret) |
+| `POST /api/overlay/regenerate` | Rotate the OBS token |
+| `POST /api/webhooks/twitch` | EventSub receiver (signature verified) |
+| `POST /api/webhooks/tips/[token]` | Donation bridge tip ingestion |
+| `GET/PUT /api/settings` | Read/save overlay settings |
+| `POST /api/license/validate` | Bind a license to the signed-in account |
+| `GET /api/auth/twitch` | Start Twitch OAuth |
+| `GET /api/auth/twitch/callback` | OAuth callback |
+| `POST /api/auth/logout` | Clear the session |
+| `GET /api/health` | Deploy check |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Points
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+`config.tip` is **points per whole dollar**; tips arrive in cents and are scaled
+by `amountCents / 100`. All other rates are points per unit.
 
-## Deploy on Vercel
+| Event | Source | Credited |
+|-------|--------|----------|
+| Tip | `/api/webhooks/tips/[token]` | Donor, if `amountCents >= tipThresholdCents` and `> 0` |
+| Bits | `channel.cheer` | Cheerer, bits × rate |
+| Sub | `channel.subscribe`, `channel.subscription.message` (not gift) | Subscriber, 1 × rate |
+| Gift bundle | `channel.subscription.gift` | Gifter, `total` × rate |
+| Raid | `channel.raid` | Raider, viewers × rate |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Gift recipients are always ignored, so a gifted bundle is credited once to the
+gifter. Anonymous events are stored under the streamer's mask name, and the real
+username never reaches the broadcast payload.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Data and resilience
+
+- `point_events` is an append-only ledger with a unique
+  `(streamer_id, twitch_event_id)` key, so retried deliveries are no-ops.
+- `flush_streamer_aggregates(uuid)` recomputes every window under a per-streamer
+  advisory lock.
+- Aggregates are recomputed once per event batch; the overlay refetches a
+  throttled snapshot on each broadcast.
+- The overlay caches its last payload in `localStorage` and keeps rendering it if
+  Realtime or Postgres is unavailable.
+- OBS token regeneration replaces `streamers.obs_token` immediately; old URLs stop
+  resolving on their next fetch.
+
+## Security model
+
+- Dashboard auth is a signed, httpOnly `lb_session` cookie created by Twitch OAuth.
+- All database access is server-side with the service-role key. RLS is enabled on
+  every table as defense-in-depth; anon/authenticated clients get nothing.
+- EventSub requests are verified with HMAC-SHA256 and a 5-minute timestamp window.
+- Twitch access tokens are encrypted with AES-256-GCM (`TOKEN_ENCRYPTION_KEY`).
+- The OBS URL token is 32 random bytes, base64url. It is the overlay channel name
+  and the tip endpoint secret — treat it like a password.
+- Chat commands require the bot shared secret **and** a broadcaster/moderator badge.
+- Secrets are never logged or echoed by an API response.
+
+## Settings
+
+Display toggles (top-25 ranks, medals, rank numbers, bars, amounts), hidden
+accounts, five point rates, tip threshold, anonymous mask, layout sliders (width,
+padding, radius), visuals (opacity, font size), five theme presets with five HEX
+overrides, and window rotation (This Stream → 7 Days → 30 Days → All-Time).
+
+## Chat commands
+
+`!leaderboard refresh` and `!leaderboard clear stream`, broadcaster/moderator only.
+The bot is `scripts/chat-bot.ts`; see `docs/VERCEL_SETUP.md` for its env vars.
+
+## Verification
+
+```powershell
+npm test
+npx tsc --noEmit
+npm run build
+```
