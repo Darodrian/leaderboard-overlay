@@ -32,12 +32,22 @@ export default async function DashboardPage() {
             </span>
           </p>
         </div>
-        <Link
-          href="/dashboard/settings"
-          className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800/60"
-        >
-          Settings
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/dashboard/settings"
+            className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800/60"
+          >
+            Settings
+          </Link>
+          <form action="/api/auth/logout" method="post">
+            <button
+              type="submit"
+              className="rounded-lg border border-slate-800 px-3 py-2 text-sm text-slate-400 hover:text-slate-200"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
       </header>
 
       <section className="rounded-xl border border-slate-800 bg-slate-950/50 p-4">
