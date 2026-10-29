@@ -73,7 +73,7 @@ body {
 }
 
 .lb-rank {
-  color: var(--lb-accent, #7c9cff);
+  color: var(--lb-rank, var(--lb-accent, #7c9cff));
   font-variant-numeric: tabular-nums;
 }
 

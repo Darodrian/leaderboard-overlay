@@ -81,10 +81,14 @@ function deepMerge<T>(base: T, patch: unknown): T {
 
   const result: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(patch)) {
+    // Theme overrides are a complete map, not a nested config: replacing the
+    // whole object lets the dashboard clear a color back to the preset.
     result[key] =
-      isPlainObject(value) && isPlainObject(result[key])
-        ? deepMerge(result[key], value)
-        : value;
+      key === "overrides"
+        ? value
+        : isPlainObject(value) && isPlainObject(result[key])
+          ? deepMerge(result[key], value)
+          : value;
   }
   return result as T;
 }
@@ -119,10 +123,17 @@ function clampSettings(settings: OverlaySettings): OverlaySettings {
   return settings;
 }
 
+export function applySettings(
+  current: OverlaySettings,
+  partial: DeepPartial<OverlaySettings>,
+): OverlaySettings {
+  return clampSettings(deepMerge(structuredClone(current), partial));
+}
+
 export function mergeSettings(
   partial: DeepPartial<OverlaySettings>,
 ): OverlaySettings {
-  return clampSettings(deepMerge(structuredClone(DEFAULT_SETTINGS), partial));
+  return applySettings(DEFAULT_SETTINGS, partial);
 }
 
 export function cssVars(settings: OverlaySettings): Record<string, string> {
@@ -132,6 +143,7 @@ export function cssVars(settings: OverlaySettings): Record<string, string> {
     "--lb-bg": theme.background,
     "--lb-text": theme.text,
     "--lb-accent": theme.accent,
+    "--lb-rank": theme.accent,
     "--lb-bar": theme.bar,
     "--lb-width": `${settings.layout.width}px`,
     "--lb-padding": `${settings.layout.padding}px`,

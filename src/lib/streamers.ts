@@ -51,3 +51,32 @@ export function toOverlaySettings(streamer: Streamer): OverlaySettings {
     rotation: streamer.rotation,
   };
 }
+
+export type StreamerSettingsRow = Pick<
+  StreamerRow,
+  | "point_config"
+  | "tip_threshold_cents"
+  | "anonymous_mask_name"
+  | "display_toggles"
+  | "hidden_accounts"
+  | "layout"
+  | "visuals"
+  | "theme"
+  | "rotation"
+>;
+
+export function settingsToRow(
+  settings: OverlaySettings,
+): StreamerSettingsRow {
+  return {
+    point_config: settings.pointConfig,
+    tip_threshold_cents: settings.tipThresholdCents,
+    anonymous_mask_name: settings.anonymousMaskName,
+    display_toggles: settings.display,
+    hidden_accounts: settings.hiddenAccounts,
+    layout: settings.layout,
+    visuals: settings.visuals,
+    theme: settings.theme,
+    rotation: settings.rotation,
+  };
+}
