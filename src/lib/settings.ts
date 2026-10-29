@@ -24,7 +24,7 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
 };
 
 export type DeepPartial<T> = {
-  [K in keyof T]?: T[K] extends Array<infer _U>
+  [K in keyof T]?: T[K] extends readonly unknown[]
     ? T[K]
     : T[K] extends object
       ? DeepPartial<T[K]>

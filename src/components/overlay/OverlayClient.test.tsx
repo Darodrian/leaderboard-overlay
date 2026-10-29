@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { OverlayClient } from "./OverlayClient";
 import { DEFAULT_SETTINGS } from "@/lib/settings";

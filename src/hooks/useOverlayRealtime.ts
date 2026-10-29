@@ -57,7 +57,7 @@ export function useOverlayRealtime(token: string, initial: OverlayState) {
 
       void refresh();
     } catch {
-      setConnected(false);
+      // Stay on the cached payload; the connection is already reported false.
     }
 
     return () => {

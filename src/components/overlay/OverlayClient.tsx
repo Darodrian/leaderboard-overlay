@@ -26,7 +26,12 @@ export function OverlayClient({ token, initial }: Props) {
   );
   const live = useOverlayRealtime(token, cached);
   const state = live.hasLiveData ? live.state : cached;
-  const [activeWindow, setActiveWindow] = useState<WindowType>(state.window);
+  const [rotation, setRotation] = useState<{
+    base: WindowType;
+    current: WindowType;
+  }>({ base: state.window, current: state.window });
+  const activeWindow =
+    rotation.base === state.window ? rotation.current : state.window;
 
   useEffect(() => {
     if (live.hasLiveData) setCached(live.state);
@@ -38,16 +43,21 @@ export function OverlayClient({ token, initial }: Props) {
   }, []);
 
   useEffect(() => {
-    setActiveWindow(state.window);
-  }, [state.window]);
-
-  useEffect(() => {
     if (!state.settings.rotation.enabled) return;
     const id = window.setInterval(() => {
-      setActiveWindow((current) => nextRotationWindow(current));
+      setRotation((previous) => {
+        const base = state.window;
+        const current =
+          previous.base === base ? previous.current : state.window;
+        return { base, current: nextRotationWindow(current) };
+      });
     }, state.settings.rotation.intervalMs);
     return () => window.clearInterval(id);
-  }, [state.settings.rotation.enabled, state.settings.rotation.intervalMs]);
+  }, [
+    state.settings.rotation.enabled,
+    state.settings.rotation.intervalMs,
+    state.window,
+  ]);
 
   const rows = state.windows?.[activeWindow] ?? state.rows;
 
