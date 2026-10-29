@@ -4,6 +4,8 @@ export type LicenseBinding = { twitchUserId: string | null };
 
 export type TokenSession = { token: string; isActive: boolean };
 
+export type RegeneratedToken = TokenSession & { previousToken: string };
+
 export function canBindLicense(
   license: LicenseBinding,
   twitchUserId: string,
@@ -21,6 +23,17 @@ export function tokenIsValid(
   presented: string,
 ): boolean {
   return session.isActive && presented.length > 0 && session.token === presented;
+}
+
+export function regenerateOverlayToken(
+  current: TokenSession,
+  newToken: string,
+): RegeneratedToken {
+  return {
+    token: newToken,
+    isActive: true,
+    previousToken: current.token,
+  };
 }
 
 function encryptionKey(keyBase64: string): Buffer {
