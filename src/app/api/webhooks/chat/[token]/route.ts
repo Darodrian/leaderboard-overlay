@@ -1,3 +1,4 @@
+import { broadcastToOverlay } from "@/lib/broadcast";
 import { loadStreamerByToken } from "@/lib/streamerStore";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -115,6 +116,28 @@ export async function POST(
         return Response.json({ error: "view time insert failed" }, { status: 500 });
       }
     }
+  }
+
+  // Flush aggregates so new chat/view-time data appears in leaderboards
+  const { error: flushError } = await supabase.rpc("flush_streamer_aggregates", {
+    p_streamer_id: streamer.id,
+    p_force: true,
+    p_board_type: null,
+  });
+
+  if (flushError) {
+    return Response.json({ error: "aggregate flush failed" }, { status: 500 });
+  }
+
+  // Broadcast so overlays refetch and show updated data
+  try {
+    await broadcastToOverlay(streamer.obsToken, "leaderboard.update", {
+      type: "leaderboard.update",
+      streamerId: streamer.id,
+      window: "this_stream",
+    });
+  } catch {
+    // Broadcast failure shouldn't fail the request; aggregates are already flushed
   }
 
   return new Response(null, { status: 204 });
