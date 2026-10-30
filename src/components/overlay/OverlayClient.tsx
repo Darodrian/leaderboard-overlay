@@ -4,7 +4,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { Leaderboard } from "./Leaderboard";
 import { useLocalCache } from "@/hooks/useLocalCache";
 import { useOverlayRealtime } from "@/hooks/useOverlayRealtime";
-import { cssVars, BOARD_LABELS, BOARD_SYMBOLS } from "@/lib/settings";
+import { cssVars, BOARD_LABELS } from "@/lib/settings";
 import type { BoardType, OverlayState, ScreenLayout, WindowType } from "@/lib/types";
 
 const WINDOW_LABELS: Record<WindowType, string> = {

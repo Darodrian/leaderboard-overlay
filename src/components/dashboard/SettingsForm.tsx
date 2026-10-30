@@ -10,7 +10,7 @@ import {
   applySettings,
   ALL_BOARD_TYPES,
   BOARD_LABELS,
-  BOARD_SYMBOLS,
+  BOARD_UNITS,
   DEFAULT_BOARD_CONFIG,
   DEFAULT_SETTINGS,
   THEMES,
@@ -60,6 +60,13 @@ const FONT_OPTIONS: { key: string; label: string }[] = [
   { key: "Lato", label: "Lato" },
   { key: "Montserrat", label: "Montserrat" },
   { key: "Poppins", label: "Poppins" },
+  { key: "Oswald", label: "Oswald" },
+  { key: "Raleway", label: "Raleway" },
+  { key: "Libre Franklin", label: "Libre Franklin" },
+  { key: "Source Sans Pro", label: "Source Sans Pro" },
+  { key: "Ubuntu", label: "Ubuntu" },
+  { key: "Merriweather", label: "Merriweather" },
+  { key: "Playfair Display", label: "Playfair Display" },
 ];
 
 type Props = {
@@ -112,7 +119,7 @@ function BoardSection({
           checked={config.active}
           onChange={(active) => onChange({ active })}
         />
-        <span className="text-xs font-mono text-slate-500">{BOARD_SYMBOLS[board]}</span>
+        <span className="text-xs font-mono text-slate-500">{BOARD_UNITS[board].symbol}</span>
       </div>
       {!config.active && (
         <p className="text-xs text-slate-500 mt-1">
@@ -262,22 +269,6 @@ export function SettingsForm({ initial, onChange }: Props) {
             className="w-full rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
           />
         </label>
-        <label
-          htmlFor="points-suffix"
-          className="block space-y-1 text-sm text-slate-200"
-        >
-          <span>Points suffix</span>
-          <input
-            id="points-suffix"
-            type="text"
-            value={settings.pointsSuffix}
-            onChange={(event) =>
-              update({ pointsSuffix: event.target.value.trim() || "pts" })
-            }
-            placeholder="pts"
-            className="w-full rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 py-2 font-mono text-xs text-slate-100 outline-none focus:border-indigo-400"
-          />
-        </label>
       </Section>
 
       <Section title="Board modes">
@@ -359,6 +350,33 @@ export function SettingsForm({ initial, onChange }: Props) {
             }
           />
         </label>
+        <Slider
+          id="layout-width"
+          label="Overlay width"
+          value={settings.layout.width}
+          min={200}
+          max={1200}
+          suffix="px"
+          onChange={(width) => update({ layout: { width } })}
+        />
+        <Slider
+          id="layout-padding"
+          label="Overlay padding"
+          value={settings.layout.padding}
+          min={0}
+          max={48}
+          suffix="px"
+          onChange={(padding) => update({ layout: { padding } })}
+        />
+        <Slider
+          id="layout-radius"
+          label="Corner radius"
+          value={settings.layout.borderRadius}
+          min={0}
+          max={999}
+          suffix="px"
+          onChange={(borderRadius) => update({ layout: { borderRadius } })}
+        />
         <p className="text-xs text-slate-500">
           Single shows one board at a time. Side by side and stacked show all
           active boards simultaneously.

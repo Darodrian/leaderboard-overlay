@@ -54,7 +54,6 @@ export const DEFAULT_SETTINGS: OverlaySettings = {  pointConfig: { tip: 100, bit
   theme: { preset: "midnight", overrides: {} },
   rotation: { enabled: false, intervalMs: 30000 },
   boards: DEFAULT_BOARDS,
-  pointsSuffix: "pts",
   screenLayout: "single",
   rotationMode: "both",
   fontFamily: "system",
@@ -191,10 +190,6 @@ function clampSettings(settings: OverlaySettings): OverlaySettings {
       : "";
   settings.anonymousMaskName = mask || "Anonymous";
 
-  const pointsSuffix =
-    typeof settings.pointsSuffix === "string" ? settings.pointsSuffix : "pts";
-  settings.pointsSuffix = pointsSuffix || "pts";
-
   if (
     settings.screenLayout !== "single" &&
     settings.screenLayout !== "side-by-side" &&
@@ -310,7 +305,6 @@ export function cssVars(settings: OverlaySettings): Record<string, string> {
     "--lb-font-size": `${settings.visuals.fontSize}px`,
     "--lb-font-family": settings.fontFamily,
     "--lb-label-align": settings.labelAlignment,
-    "--lb-points-suffix": settings.pointsSuffix,
     ...settings.theme.overrides,
   };
 }
@@ -327,15 +321,21 @@ export function nextRotationWindow(
   return order[(index + 1) % order.length];
 }
 
-export const BOARD_SYMBOLS: Record<BoardType, string> = {
-  points: "pts",
-  donations: "$",
-  bits: "bit",
-  subs: "sub",
-  raiders: "raid",
-  view_time: "⏱",
-  chat_messages: "💬",
-  clips: "🎥",
+export type BoardUnit = {
+  singular: string;
+  plural: string;
+  symbol: string;
+};
+
+export const BOARD_UNITS: Record<BoardType, BoardUnit> = {
+  points: { singular: "pt", plural: "pts", symbol: "pts" },
+  donations: { singular: "$", plural: "$", symbol: "$" },
+  bits: { singular: "bit", plural: "bits", symbol: "bit" },
+  subs: { singular: "sub", plural: "subs", symbol: "sub" },
+  raiders: { singular: "viewer", plural: "viewers", symbol: "raid" },
+  view_time: { singular: "s", plural: "s", symbol: "time" },
+  chat_messages: { singular: "message", plural: "messages", symbol: "💬" },
+  clips: { singular: "clip", plural: "clips", symbol: "🎥" },
 };
 
 export const BOARD_LABELS: Record<BoardType, string> = {
@@ -348,3 +348,23 @@ export const BOARD_LABELS: Record<BoardType, string> = {
   chat_messages: "Chat",
   clips: "Clips",
 };
+
+export function formatBoardQuantity(boardType: BoardType, quantity: number): string {
+  const unit = BOARD_UNITS[boardType];
+
+  if (boardType === "view_time") {
+    const hours = Math.floor(quantity / 3600);
+    const minutes = Math.floor((quantity % 3600) / 60);
+    const seconds = quantity % 60;
+
+    const parts: string[] = [];
+    if (hours > 0) parts.push(`${hours}h`);
+    if (minutes > 0 || hours > 0) parts.push(`${minutes}m`);
+    parts.push(`${seconds}s`);
+
+    return parts.join(" ") || "0s";
+  }
+
+  const label = quantity === 1 ? unit.singular : unit.plural;
+  return `${quantity} ${label}`;
+}

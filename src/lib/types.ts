@@ -81,7 +81,6 @@ export type Streamer = {
   theme: ThemeSettings;
   rotation: RotationSettings;
   boards: BoardConfigs;
-  pointsSuffix: string;
   screenLayout: ScreenLayout;
   rotationMode: RotationMode;
   fontFamily: string;
@@ -105,7 +104,6 @@ export type OverlaySettings = Pick<
   | "theme"
   | "rotation"
   | "boards"
-  | "pointsSuffix"
   | "screenLayout"
   | "rotationMode"
   | "fontFamily"

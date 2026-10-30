@@ -1,5 +1,5 @@
 import type { BoardType, LeaderboardRow, OverlaySettings, WindowType } from "@/lib/types";
-import { BOARD_SYMBOLS, BOARD_LABELS } from "@/lib/settings";
+import { BOARD_LABELS, formatBoardQuantity } from "@/lib/settings";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -17,8 +17,6 @@ export function Leaderboard({ rows, board, settings, window }: Props) {
 
   const boardCfg = settings.boards[board];
   const rankCount = boardCfg?.rankCount ?? 25;
-  const symbol = BOARD_SYMBOLS[board];
-  const suffix = settings.pointsSuffix;
 
   const visible = [...rows]
     .filter((row) => !hidden.has(row.username.toLowerCase()))
@@ -31,7 +29,6 @@ export function Leaderboard({ rows, board, settings, window }: Props) {
   return (
     <ol className="lb-list" data-window={window} data-board={board}>
       <li className="lb-board-header">
-        <span className="lb-board-symbol">{symbol}</span>
         <span className="lb-board-label">{BOARD_LABELS[board]}</span>
       </li>
       {visible.map((row, index) => {
@@ -51,7 +48,7 @@ export function Leaderboard({ rows, board, settings, window }: Props) {
             <span className="lb-name">{row.username}</span>
             {settings.display.amounts ? (
               <span className="lb-quantity">
-                {row.quantity.toLocaleString()} {suffix}
+                {formatBoardQuantity(board, row.quantity)}
               </span>
             ) : null}
             {settings.display.bars ? (

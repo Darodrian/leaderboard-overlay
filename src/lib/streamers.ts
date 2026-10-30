@@ -16,7 +16,6 @@ export type StreamerRow = {
   theme: Streamer["theme"];
   rotation: Streamer["rotation"];
   boards: Streamer["boards"];
-  points_suffix: string;
   screen_layout: string;
   rotation_mode: string;
   font_family: string;
@@ -45,7 +44,6 @@ export function mapStreamerRow(row: StreamerRow): Streamer {
     theme: row.theme,
     rotation: row.rotation,
     boards: row.boards,
-    pointsSuffix: row.points_suffix,
     screenLayout: row.screen_layout as ScreenLayout,
     rotationMode: row.rotation_mode as RotationMode,
     fontFamily: row.font_family,
@@ -70,7 +68,6 @@ export function toOverlaySettings(streamer: Streamer): OverlaySettings {
     theme: streamer.theme,
     rotation: streamer.rotation,
     boards: streamer.boards,
-    pointsSuffix: streamer.pointsSuffix,
     screenLayout: streamer.screenLayout,
     rotationMode: streamer.rotationMode,
     fontFamily: streamer.fontFamily,
@@ -94,7 +91,6 @@ export type StreamerSettingsRow = Pick<
   | "theme"
   | "rotation"
   | "boards"
-  | "points_suffix"
   | "screen_layout"
   | "rotation_mode"
   | "font_family"
@@ -119,7 +115,6 @@ export function settingsToRow(
     theme: settings.theme,
     rotation: settings.rotation,
     boards: settings.boards,
-    points_suffix: settings.pointsSuffix,
     screen_layout: settings.screenLayout,
     rotation_mode: settings.rotationMode,
     font_family: settings.fontFamily,

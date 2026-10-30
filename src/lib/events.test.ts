@@ -33,7 +33,6 @@ const streamer: Streamer = {
     chat_messages: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
     clips: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
   },
-  pointsSuffix: "pts",
   screenLayout: "single",
   rotationMode: "both",
   fontFamily: "system",
