@@ -1,4 +1,4 @@
-export type WindowType = "this_stream" | "7d" | "30d" | "alltime";
+﻿export type WindowType = "this_stream" | "7d" | "30d" | "alltime";
 
 export type EventType = "tip" | "bit" | "sub" | "gift" | "raid";
 
@@ -8,7 +8,7 @@ export type BoardType =
   | "bits"
   | "subs"
   | "raiders"
-  | "view_time"
+  
   | "chat_messages"
   | "clips";
 
@@ -85,9 +85,7 @@ export type Streamer = {
   rotationMode: RotationMode;
   fontFamily: string;
   labelAlignment: LabelAlignment;
-  excludeBroadcasterFromViewTime: boolean;
-  excludeModsFromViewTime: boolean;
-  excludeBroadcasterFromChatMessages: boolean;
+excludeBroadcasterFromChatMessages: boolean;
   excludeModsFromChatMessages: boolean;
   createdAt: string;
 };
@@ -108,9 +106,7 @@ export type OverlaySettings = Pick<
   | "rotationMode"
   | "fontFamily"
   | "labelAlignment"
-  | "excludeBroadcasterFromViewTime"
-  | "excludeModsFromViewTime"
-  | "excludeBroadcasterFromChatMessages"
+| "excludeBroadcasterFromChatMessages"
   | "excludeModsFromChatMessages"
 >;
 
@@ -174,3 +170,4 @@ export type OverlayState = {
   /** A flush was skipped by the 2s throttle; the overlay should refetch soon. */
   pending?: boolean;
 };
+

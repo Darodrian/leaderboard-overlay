@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+﻿import { describe, it, expect, vi } from "vitest";
 import { handleEvent } from "./events";
 import type { Streamer } from "./types";
 
@@ -29,7 +29,6 @@ const streamer: Streamer = {
     bits: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
     subs: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
     raiders: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
-    view_time: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
     chat_messages: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
     clips: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
   },
@@ -37,8 +36,6 @@ const streamer: Streamer = {
   rotationMode: "both",
   fontFamily: "system",
   labelAlignment: "center",
-  excludeBroadcasterFromViewTime: false,
-  excludeModsFromViewTime: false,
   excludeBroadcasterFromChatMessages: false,
   excludeModsFromChatMessages: false,
   createdAt: "2026-01-01T00:00:00.000Z",
@@ -196,3 +193,7 @@ describe("handleEvent", () => {
     expect(out).toBe("unknown-streamer");
   });
 });
+
+
+
+

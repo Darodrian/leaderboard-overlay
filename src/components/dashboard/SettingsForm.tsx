@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState } from "react";
 import { ColorField } from "./controls/ColorField";
@@ -11,7 +11,7 @@ import {
   ALL_BOARD_TYPES,
   BOARD_LABELS,
   BOARD_UNITS,
-  DEFAULT_BOARD_CONFIG,
+  DEFAULT_BOARDS,
   DEFAULT_SETTINGS,
   THEMES,
   type DeepPartial,
@@ -67,8 +67,8 @@ const FONT_OPTIONS: { key: string; label: string }[] = [
   { key: "Ubuntu", label: "Ubuntu" },
   { key: "Merriweather", label: "Merriweather" },
   { key: "Playfair Display", label: "Playfair Display" },
-  { key: "Press Start 2P", label: "Press Start 2P (Pixel)" },
-  { key: "VT323", label: "VT323 (Terminal)" },
+  { key: "Press Start 2P", label: "Press Start 2P" },
+  { key: "VT323", label: "VT323" },
   { key: "Share Tech Mono", label: "Share Tech Mono" },
   { key: "Special Elite", label: "Special Elite" },
   { key: "Gagalin", label: "Gagalin" },
@@ -248,9 +248,7 @@ export function SettingsForm({ initial, onChange }: Props) {
               id={`points-${field.key}`}
               label={field.label}
               value={settings.pointConfig[field.key]}
-              onChange={(value) =>
-                update({ pointConfig: { [field.key]: value } })
-              }
+              onChange={(value) => update({ pointConfig: { [field.key]: value } })}
             />
           ))}
           <NumberField
@@ -270,8 +268,7 @@ export function SettingsForm({ initial, onChange }: Props) {
             type="text"
             value={settings.anonymousMaskName ?? ""}
             onChange={(event) =>
-              update({ anonymousMaskName: event.target.value || null })
-            }
+              update({ anonymousMaskName: event.target.value || null })}
             className="w-full rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
           />
         </label>
@@ -284,7 +281,8 @@ export function SettingsForm({ initial, onChange }: Props) {
         </p>
         <div className="space-y-2">
           {ALL_BOARD_TYPES.map((board) => {
-            const config = settings.boards[board] ?? DEFAULT_BOARD_CONFIG;
+            const config =
+              (settings.boards[board] ?? DEFAULT_BOARDS[board] ?? DEFAULT_BOARDS.points) as BoardConfig;
             return (
               <BoardSection
                 key={board}
@@ -301,43 +299,6 @@ export function SettingsForm({ initial, onChange }: Props) {
               />
             );
           })}
-          <div className="space-y-3 rounded-lg border border-slate-700/40 bg-slate-900/30 p-3">
-            <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-              Exclusion options
-            </h3>
-            <Toggle
-              id="exclude-broadcaster-view-time"
-              label="Exclude broadcaster from view time"
-              checked={settings.excludeBroadcasterFromViewTime}
-              onChange={(excluded) =>
-                update({ excludeBroadcasterFromViewTime: excluded })
-              }
-            />
-            <Toggle
-              id="exclude-mods-view-time"
-              label="Exclude mods from view time"
-              checked={settings.excludeModsFromViewTime}
-              onChange={(excluded) =>
-                update({ excludeModsFromViewTime: excluded })
-              }
-            />
-            <Toggle
-              id="exclude-broadcaster-chat"
-              label="Exclude broadcaster from chat messages"
-              checked={settings.excludeBroadcasterFromChatMessages}
-              onChange={(excluded) =>
-                update({ excludeBroadcasterFromChatMessages: excluded })
-              }
-            />
-            <Toggle
-              id="exclude-mods-chat"
-              label="Exclude mods from chat messages"
-              checked={settings.excludeModsFromChatMessages}
-              onChange={(excluded) =>
-                update({ excludeModsFromChatMessages: excluded })
-              }
-            />
-          </div>
         </div>
       </Section>
 
@@ -352,8 +313,7 @@ export function SettingsForm({ initial, onChange }: Props) {
             value={settings.screenLayout}
             options={SCREEN_LAYOUTS}
             onChange={(value) =>
-              update({ screenLayout: value as "single" | "side-by-side" | "stacked" })
-            }
+              update({ screenLayout: value as "single" | "side-by-side" | "stacked" })}
           />
         </label>
         <Slider
@@ -430,8 +390,7 @@ export function SettingsForm({ initial, onChange }: Props) {
             value={settings.labelAlignment}
             options={LABEL_ALIGNMENTS}
             onChange={(value) =>
-              update({ labelAlignment: value as "left" | "center" | "right" })
-            }
+              update({ labelAlignment: value as "left" | "center" | "right" })}
           />
         </label>
       </Section>
@@ -446,8 +405,7 @@ export function SettingsForm({ initial, onChange }: Props) {
             id="theme-preset"
             value={settings.theme.preset}
             onChange={(event) =>
-              update({ theme: { preset: event.target.value as ThemePreset } })
-            }
+              update({ theme: { preset: event.target.value as ThemePreset } })}
             className="w-full rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
           >
             {Object.keys(THEMES).map((name) => (
@@ -487,8 +445,7 @@ export function SettingsForm({ initial, onChange }: Props) {
             value={settings.rotationMode}
             options={ROTATION_MODES}
             onChange={(value) =>
-              update({ rotationMode: value as "boards" | "windows" | "both" })
-            }
+              update({ rotationMode: value as "boards" | "windows" | "both" })}
           />
         </label>
         <NumberField
@@ -498,8 +455,7 @@ export function SettingsForm({ initial, onChange }: Props) {
           min={3}
           max={300}
           onChange={(seconds) =>
-            update({ rotation: { intervalMs: seconds * 1000 } })
-          }
+            update({ rotation: { intervalMs: seconds * 1000 } })}
         />
         <p className="text-xs text-slate-500">
           Cycles through active boards and/or time windows based on rotation mode.
@@ -508,3 +464,6 @@ export function SettingsForm({ initial, onChange }: Props) {
     </div>
   );
 }
+
+
+

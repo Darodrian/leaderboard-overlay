@@ -1,4 +1,4 @@
-import type {
+﻿import type {
   BoardConfig,
   BoardConfigs,
   BoardType,
@@ -10,19 +10,12 @@ import type {
   WindowType,
 } from "./types";
 
-export const DEFAULT_BOARD_CONFIG: BoardConfig = {
-  active: false,
-  windows: ["this_stream", "7d", "30d", "alltime"],
-  rankCount: 25,
-};
-
 export const DEFAULT_BOARDS: BoardConfigs = {
   points: { active: true, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 25 },
   donations: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
   bits: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
   subs: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
   raiders: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
-  view_time: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
   chat_messages: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
   clips: { active: false, windows: ["this_stream", "7d", "30d", "alltime"], rankCount: 10 },
 };
@@ -33,12 +26,12 @@ export const ALL_BOARD_TYPES: BoardType[] = [
   "bits",
   "subs",
   "raiders",
-  "view_time",
   "chat_messages",
   "clips",
 ];
 
-export const DEFAULT_SETTINGS: OverlaySettings = {  pointConfig: { tip: 100, bit: 1, sub: 500, gift: 300, raid: 50 },
+export const DEFAULT_SETTINGS: OverlaySettings = {
+  pointConfig: { tip: 100, bit: 1, sub: 500, gift: 300, raid: 50 },
   tipThresholdCents: 0,
   anonymousMaskName: "Mystery Supporter",
   display: {
@@ -58,8 +51,6 @@ export const DEFAULT_SETTINGS: OverlaySettings = {  pointConfig: { tip: 100, bit
   rotationMode: "both",
   fontFamily: "system",
   labelAlignment: "center",
-  excludeBroadcasterFromViewTime: false,
-  excludeModsFromViewTime: false,
   excludeBroadcasterFromChatMessages: false,
   excludeModsFromChatMessages: false,
 };
@@ -125,8 +116,6 @@ function deepMerge<T>(base: T, patch: unknown): T {
     if (key === "__proto__" || key === "constructor" || key === "prototype") {
       continue;
     }
-    // Theme overrides and boards are complete maps: replacing the whole object
-    // lets the dashboard clear a color or reset a board back to defaults.
     result[key] =
       key === "overrides" || key === "boards"
         ? value
@@ -150,18 +139,10 @@ function clampSettings(settings: OverlaySettings): OverlaySettings {
   settings.layout.padding = clampNumber(settings.layout.padding, 0, 48);
   settings.layout.borderRadius = clampNumber(settings.layout.borderRadius, 0, 999);
   settings.rotation.intervalMs = clampNumber(settings.rotation.intervalMs, 3000, 300000);
-  settings.tipThresholdCents = clampNumber(
-    settings.tipThresholdCents,
-    0,
-    Number.MAX_SAFE_INTEGER,
-  );
+  settings.tipThresholdCents = clampNumber(settings.tipThresholdCents, 0, Number.MAX_SAFE_INTEGER);
 
   for (const key of Object.keys(settings.pointConfig) as (keyof PointConfig)[]) {
-    settings.pointConfig[key] = clampNumber(
-      settings.pointConfig[key],
-      0,
-      Number.MAX_SAFE_INTEGER,
-    );
+    settings.pointConfig[key] = clampNumber(settings.pointConfig[key], 0, Number.MAX_SAFE_INTEGER);
   }
 
   const unknownDisplay = settings.display as unknown as Record<string, unknown>;
@@ -171,10 +152,7 @@ function clampSettings(settings: OverlaySettings): OverlaySettings {
     }
   }
 
-  // Coerce new boolean toggles
   const boolDefaults = {
-    excludeBroadcasterFromViewTime: DEFAULT_SETTINGS.excludeBroadcasterFromViewTime,
-    excludeModsFromViewTime: DEFAULT_SETTINGS.excludeModsFromViewTime,
     excludeBroadcasterFromChatMessages: DEFAULT_SETTINGS.excludeBroadcasterFromChatMessages,
     excludeModsFromChatMessages: DEFAULT_SETTINGS.excludeModsFromChatMessages,
   } as const;
@@ -184,10 +162,7 @@ function clampSettings(settings: OverlaySettings): OverlaySettings {
     }
   }
 
-  const mask =
-    typeof settings.anonymousMaskName === "string"
-      ? settings.anonymousMaskName.trim()
-      : "";
+  const mask = typeof settings.anonymousMaskName === "string" ? settings.anonymousMaskName.trim() : "";
   settings.anonymousMaskName = mask || "Anonymous";
 
   if (
@@ -206,6 +181,10 @@ function clampSettings(settings: OverlaySettings): OverlaySettings {
     settings.rotationMode = DEFAULT_SETTINGS.rotationMode;
   }
 
+  if (typeof settings.fontFamily !== "string" || settings.fontFamily.length === 0) {
+    settings.fontFamily = DEFAULT_SETTINGS.fontFamily;
+  }
+
   if (
     settings.labelAlignment !== "left" &&
     settings.labelAlignment !== "center" &&
@@ -214,11 +193,6 @@ function clampSettings(settings: OverlaySettings): OverlaySettings {
     settings.labelAlignment = DEFAULT_SETTINGS.labelAlignment;
   }
 
-  if (typeof settings.fontFamily !== "string" || settings.fontFamily.length === 0) {
-    settings.fontFamily = DEFAULT_SETTINGS.fontFamily;
-  }
-
-  // Clamp boards: validate each board config
   const boards: Record<string, BoardConfig> = {};
   const allBoardTypes: BoardType[] = [
     "points",
@@ -226,7 +200,6 @@ function clampSettings(settings: OverlaySettings): OverlaySettings {
     "bits",
     "subs",
     "raiders",
-    "view_time",
     "chat_messages",
     "clips",
   ];
@@ -239,18 +212,14 @@ function clampSettings(settings: OverlaySettings): OverlaySettings {
       typeof settings.boards === "object" &&
       !Array.isArray(settings.boards)
     ) {
-      boardCfg = (settings.boards as Record<string, BoardConfig | undefined>)[
-        boardType
-      ];
+      boardCfg = (settings.boards as Record<string, BoardConfig | undefined>)[boardType];
     }
 
     boards[boardType] = {
       active: boardCfg?.active ?? defaultBoard.active,
       windows: boardCfg?.windows &&
         boardCfg.windows.length > 0 &&
-        boardCfg.windows.every((w) =>
-          ["this_stream", "7d", "30d", "alltime"].includes(w),
-        )
+        boardCfg.windows.every((w) => ["this_stream", "7d", "30d", "alltime"].includes(w))
         ? boardCfg.windows
         : defaultBoard.windows,
       rankCount:
@@ -303,7 +272,9 @@ export function cssVars(settings: OverlaySettings): Record<string, string> {
     "--lb-radius": `${settings.layout.borderRadius}px`,
     "--lb-opacity": `${settings.visuals.opacity / 100}`,
     "--lb-font-size": `${settings.visuals.fontSize}px`,
-    "--lb-font-family": settings.fontFamily,
+    "--lb-font-family": settings.fontFamily.includes(" ")
+      ? `"${settings.fontFamily}"`
+      : settings.fontFamily,
     "--lb-label-align": settings.labelAlignment,
     ...settings.theme.overrides,
   };
@@ -333,7 +304,6 @@ export const BOARD_UNITS: Record<BoardType, BoardUnit> = {
   bits: { singular: "bit", plural: "bits", symbol: "bit" },
   subs: { singular: "sub", plural: "subs", symbol: "sub" },
   raiders: { singular: "viewer", plural: "viewers", symbol: "raid" },
-  view_time: { singular: "s", plural: "s", symbol: "time" },
   chat_messages: { singular: "message", plural: "messages", symbol: "💬" },
   clips: { singular: "clip", plural: "clips", symbol: "🎥" },
 };
@@ -344,7 +314,6 @@ export const BOARD_LABELS: Record<BoardType, string> = {
   bits: "Bits",
   subs: "Subs",
   raiders: "Raiders",
-  view_time: "View Time",
   chat_messages: "Chat",
   clips: "Clips",
 };
@@ -352,19 +321,7 @@ export const BOARD_LABELS: Record<BoardType, string> = {
 export function formatBoardQuantity(boardType: BoardType, quantity: number): string {
   const unit = BOARD_UNITS[boardType];
 
-  if (boardType === "view_time") {
-    const hours = Math.floor(quantity / 3600);
-    const minutes = Math.floor((quantity % 3600) / 60);
-    const seconds = quantity % 60;
-
-    const parts: string[] = [];
-    if (hours > 0) parts.push(`${hours}h`);
-    if (minutes > 0 || hours > 0) parts.push(`${minutes}m`);
-    parts.push(`${seconds}s`);
-
-    return parts.join(" ") || "0s";
-  }
-
   const label = quantity === 1 ? unit.singular : unit.plural;
   return `${quantity} ${label}`;
 }
+

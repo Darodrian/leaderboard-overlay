@@ -1,4 +1,4 @@
--- Twitch Leaderboard Overlay — initial schema
+﻿-- Twitch Leaderboard Overlay â€” initial schema
 -- Run in the Supabase SQL editor (or via `supabase db push`).
 
 create extension if not exists pgcrypto;
@@ -92,28 +92,6 @@ begin
   ) then
     alter table streamers
       add column label_alignment text not null default 'center';
-  end if;
-end $$;
-
-do $$
-begin
-  if not exists (
-    select 1 from information_schema.columns
-    where table_name = 'streamers' and column_name = 'exclude_broadcaster_from_view_time'
-  ) then
-    alter table streamers
-      add column exclude_broadcaster_from_view_time boolean not null default false;
-  end if;
-end $$;
-
-do $$
-begin
-  if not exists (
-    select 1 from information_schema.columns
-    where table_name = 'streamers' and column_name = 'exclude_mods_from_view_time'
-  ) then
-    alter table streamers
-      add column exclude_mods_from_view_time boolean not null default false;
   end if;
 end $$;
 
@@ -256,19 +234,6 @@ alter table point_events enable row level security;
 alter table stream_windows enable row level security;
 alter table leaderboard_aggregates enable row level security;
 
-create table if not exists view_sessions (
-  id uuid primary key default gen_random_uuid(),
-  streamer_id uuid not null references streamers(id) on delete cascade,
-  twitch_user_id text not null,
-  username text not null,
-  started_at timestamptz not null default now(),
-  ended_at timestamptz,
-  duration_seconds integer not null default 0 check (duration_seconds >= 0)
-);
-
-create index if not exists idx_view_sessions_streamer_user
-  on view_sessions (streamer_id, twitch_user_id);
-
 create table if not exists chat_events (
   id uuid primary key default gen_random_uuid(),
   streamer_id uuid not null references streamers(id) on delete cascade,
@@ -332,10 +297,6 @@ drop policy if exists leaderboard_aggregates_self on leaderboard_aggregates;
 create policy leaderboard_aggregates_self on leaderboard_aggregates
   for select using (streamer_id = auth.uid());
 
-drop policy if exists view_sessions_self on view_sessions;
-create policy view_sessions_self on view_sessions
-  for all using (streamer_id = auth.uid()) with check (streamer_id = auth.uid());
-
 drop policy if exists chat_events_self on chat_events;
 create policy chat_events_self on chat_events
   for all using (streamer_id = auth.uid()) with check (streamer_id = auth.uid());
@@ -365,7 +326,7 @@ declare
   v_window text;
   v_since timestamptz;
   v_last timestamptz;
-  v_boards text[] := array['points','donations','bits','subs','raiders','view_time','chat_messages','clips'];
+  v_boards text[] := array['points','donations','bits','subs','raiders','chat_messages','clips'];
 begin
   perform pg_advisory_xact_lock(hashtext(p_streamer_id::text));
 
@@ -493,23 +454,7 @@ begin
             and created_at >= v_since
           group by credited_user_id;
 
-        when 'view_time' then
-          insert into leaderboard_aggregates
-            (streamer_id, window_type, board_type, user_id, username, quantity, last_event_at)
-          select
-            p_streamer_id,
-            v_window,
-            v_board,
-            vs.twitch_user_id,
-            max(vs.username),
-            sum(vs.duration_seconds)::integer,
-            max(vs.started_at)
-          from view_sessions vs
-          where vs.streamer_id = p_streamer_id
-            and vs.started_at >= v_since
-          group by vs.twitch_user_id;
-
-        when 'chat_messages' then
+when 'chat_messages' then
           insert into leaderboard_aggregates
             (streamer_id, window_type, board_type, user_id, username, quantity, last_event_at)
           select
@@ -554,3 +499,4 @@ revoke all on function public.flush_streamer_aggregates(uuid, boolean, text)
   from public, anon, authenticated;
 grant execute on function public.flush_streamer_aggregates(uuid, boolean, text)
   to service_role;
+

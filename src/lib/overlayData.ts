@@ -1,4 +1,4 @@
-import "server-only";
+﻿import "server-only";
 import { licenseIsActive } from "./access";
 import { tokenIsValid } from "./licensing";
 import { mapStreamerRow, toOverlaySettings, type StreamerRow } from "./streamers";
@@ -11,7 +11,7 @@ import type {
   OverlayState,
   WindowType,
 } from "./types";
-import { DEFAULT_BOARD_CONFIG, DEFAULT_BOARDS } from "./settings";
+import { DEFAULT_BOARDS } from "./settings";
 
 export const WINDOW_TYPES: WindowType[] = [
   "this_stream",
@@ -26,7 +26,6 @@ export const ALL_BOARD_TYPES: BoardType[] = [
   "bits",
   "subs",
   "raiders",
-  "view_time",
   "chat_messages",
   "clips",
 ];
@@ -110,8 +109,8 @@ export async function loadOverlayState(
   for (const boardType of ALL_BOARD_TYPES) {
     const boardCfg: BoardConfig =
       ((boardConfigs as Record<string, BoardConfig | undefined>)[boardType] ??
-        DEFAULT_BOARDS[boardType] as BoardConfig | undefined) ??
-      DEFAULT_BOARD_CONFIG;
+        DEFAULT_BOARDS[boardType] as BoardConfig) ??
+      DEFAULT_BOARDS.points;
     const activeWindows = boardCfg.windows;
     const rankCount = boardCfg.rankCount;
 
@@ -138,3 +137,5 @@ export async function loadOverlayState(
     pending,
   };
 }
+
+

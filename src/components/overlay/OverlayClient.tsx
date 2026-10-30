@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { Leaderboard } from "./Leaderboard";
@@ -36,6 +36,10 @@ export function OverlayClient({ token, initial }: Props) {
   useEffect(() => {
     if (!viewerId) return;
 
+    let timer: ReturnType<typeof setInterval> | null = null;
+    let visibilityHandler: (() => void) | null = null;
+    let beforeUnloadHandler: (() => void) | null = null;
+
     const sendHeartbeat = async () => {
       try {
         await fetch(`/api/overlay/${token}/heartbeat`, {
@@ -48,9 +52,45 @@ export function OverlayClient({ token, initial }: Props) {
       }
     };
 
-    sendHeartbeat();
-    const timer = setInterval(sendHeartbeat, 30000);
-    return () => clearInterval(timer);
+    const start = () => {
+      sendHeartbeat();
+      timer = setInterval(sendHeartbeat, 30000);
+    };
+
+    const stop = () => {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    // Send heartbeat on page unload
+    const handleBeforeUnload = () => {
+      sendHeartbeat();
+      stop();
+    };
+
+    visibilityHandler = () => {
+      if (document.visibilityState === "visible") {
+        start();
+      } else {
+        stop();
+        sendHeartbeat(); // Final heartbeat when tab becomes hidden
+      }
+    };
+
+    beforeUnloadHandler = handleBeforeUnload;
+
+    start();
+
+    document.addEventListener("visibilitychange", visibilityHandler);
+    window.addEventListener("beforeunload", beforeUnloadHandler);
+
+    return () => {
+      stop();
+      document.removeEventListener("visibilitychange", visibilityHandler);
+      window.removeEventListener("beforeunload", beforeUnloadHandler);
+    };
   }, [token, viewerId]);
 
   const activeBoards = Object.entries(state.settings.boards).filter(
@@ -150,7 +190,7 @@ export function OverlayClient({ token, initial }: Props) {
       >
         {state.settings.rotation.enabled && isSingle ? (
           <div className="lb-window mb-1">
-            {BOARD_LABELS[board]} — {WINDOW_LABELS[window]}
+            {BOARD_LABELS[board]} â€” {WINDOW_LABELS[window]}
           </div>
         ) : null}
         {bs ? (
@@ -189,3 +229,4 @@ export function OverlayClient({ token, initial }: Props) {
     </div>
   );
 }
+

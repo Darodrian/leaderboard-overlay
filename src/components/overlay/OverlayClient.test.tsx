@@ -1,4 +1,4 @@
-import { it, expect, beforeEach } from "vitest";
+﻿import { it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { OverlayClient } from "./OverlayClient";
 import { DEFAULT_SETTINGS } from "@/lib/settings";
@@ -15,7 +15,6 @@ const makeOverlayState = (overrides: Partial<OverlayState> = {}): OverlayState =
     bits: { rows: [], window: "this_stream", rankCount: 10 },
     subs: { rows: [], window: "this_stream", rankCount: 10 },
     raiders: { rows: [], window: "this_stream", rankCount: 10 },
-    view_time: { rows: [], window: "this_stream", rankCount: 10 },
     chat_messages: { rows: [], window: "this_stream", rankCount: 10 },
     clips: { rows: [], window: "this_stream", rankCount: 10 },
   },
@@ -39,7 +38,6 @@ it("renders cached rows when the live state is empty", async () => {
       bits: { rows: [], window: "this_stream", rankCount: 10 },
       subs: { rows: [], window: "this_stream", rankCount: 10 },
       raiders: { rows: [], window: "this_stream", rankCount: 10 },
-      view_time: { rows: [], window: "this_stream", rankCount: 10 },
       chat_messages: { rows: [], window: "this_stream", rankCount: 10 },
       clips: { rows: [], window: "this_stream", rankCount: 10 },
     },
@@ -55,3 +53,5 @@ it("renders cached rows when the live state is empty", async () => {
 
   expect(await screen.findByText("Cached")).toBeInTheDocument();
 });
+
+
