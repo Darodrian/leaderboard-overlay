@@ -62,24 +62,27 @@ body {
 
 .lb-board-header {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  flex-direction: column;
+  align-items: var(--lb-label-align, center);
+  gap: 4px;
   margin-bottom: 8px;
   padding-bottom: 4px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.lb-board-symbol {
+.lb-board-label-main {
   font-size: 0.85em;
-  color: var(--lb-accent, #7c9cff);
-}
-
-.lb-board-label {
-  font-size: 0.75em;
-  letter-spacing: 0.08em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--lb-text, #e6edf3);
-  opacity: 0.8;
+}
+
+.lb-board-label-sub {
+  font-size: 0.7em;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--lb-accent, #7c9cff);
 }
 
 .lb-window {

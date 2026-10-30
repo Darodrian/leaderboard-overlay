@@ -26,11 +26,16 @@ export function Leaderboard({ rows, board, settings, window }: Props) {
   const max = Math.max(1, ...visible.map((row) => row.quantity));
   const showRankColumn = settings.display.ranks;
 
+  // Resolve board label: custom override > board default name
+  const boardLabel =
+    settings.boardLabels?.[board] ?? BOARD_LABELS[board];
+
   return (
     <ol className="lb-list" data-window={window} data-board={board}>
-      <li className="lb-board-header">
-        <span className="lb-board-label">{BOARD_LABELS[board]}</span>
-      </li>
+      <header className="lb-board-header">
+        <span className="lb-board-label-main">{boardLabel}</span>
+        <span className="lb-board-label-sub">{window}</span>
+      </header>
       {visible.map((row, index) => {
         const rank = index + 1;
         const showMedal = showRankColumn && settings.display.medals && rank <= 3;

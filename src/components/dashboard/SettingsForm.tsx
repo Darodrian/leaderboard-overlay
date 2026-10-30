@@ -302,6 +302,34 @@ export function SettingsForm({ initial, onChange }: Props) {
         </div>
       </Section>
 
+      <Section title="Board Labels">
+        <p className="text-xs text-slate-500">
+          Customize the display name for each board on the overlay. Leave blank
+          to use the default board name.
+        </p>
+        <div className="space-y-2">
+          {ALL_BOARD_TYPES.map((board) => (
+            <div key={board} className="flex items-center gap-3">
+              <span className="w-24 text-xs text-slate-500">{BOARD_LABELS[board]}</span>
+              <input
+                id={`board-label-${board}`}
+                type="text"
+                value={settings.boardLabels[board] || ""}
+                placeholder={BOARD_LABELS[board]}
+                onChange={(event) =>
+                  update({
+                    boardLabels: {
+                      ...settings.boardLabels,
+                      [board]: event.target.value || undefined,
+                    },
+                  })}
+                className="w-full rounded-lg border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-slate-100 outline-none focus:border-indigo-400"
+              />
+            </div>
+          ))}
+        </div>
+      </Section>
+
       <Section title="Layout">
         <label
           htmlFor="screen-layout"

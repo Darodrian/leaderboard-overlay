@@ -51,6 +51,7 @@ export const DEFAULT_SETTINGS: OverlaySettings = {
   rotationMode: "both",
   fontFamily: "system",
   labelAlignment: "center",
+  boardLabels: {},
   excludeBroadcasterFromChatMessages: false,
   excludeModsFromChatMessages: false,
 };

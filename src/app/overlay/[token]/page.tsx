@@ -1,4 +1,3 @@
-import Head from "next/head";
 import { notFound } from "next/navigation";
 import { OverlayClient } from "@/components/overlay/OverlayClient";
 import { loadOverlayState } from "@/lib/overlayData";
@@ -22,14 +21,16 @@ export default async function OverlayPage({
 
   if (!state) notFound();
 
-  const fontUrl = state.settings.fontFamily !== "system" ? googleFontsUrl(state.settings.fontFamily) : null;
+  const fontUrl =
+    state.settings.fontFamily !== "system" ? googleFontsUrl(state.settings.fontFamily) : null;
 
   return (
     <>
-      <Head>
-        {fontUrl && <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />}
-        {fontUrl && <link rel="stylesheet" href={fontUrl} />}
-      </Head>
+      {fontUrl && (
+        <style>
+          {`@import url('${fontUrl}');`}
+        </style>
+      )}
       <OverlayClient token={token} initial={state} />
     </>
   );

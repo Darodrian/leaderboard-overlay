@@ -1,4 +1,4 @@
-﻿-- Twitch Leaderboard Overlay â€” initial schema
+-- Twitch Leaderboard Overlay â€” initial schema
 -- Run in the Supabase SQL editor (or via `supabase db push`).
 
 create extension if not exists pgcrypto;
@@ -92,6 +92,17 @@ begin
   ) then
     alter table streamers
       add column label_alignment text not null default 'center';
+  end if;
+end $$;
+
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_name = 'streamers' and column_name = 'board_labels'
+  ) then
+    alter table streamers
+      add column board_labels text not null default '{}';
   end if;
 end $$;
 
@@ -499,4 +510,8 @@ revoke all on function public.flush_streamer_aggregates(uuid, boolean, text)
   from public, anon, authenticated;
 grant execute on function public.flush_streamer_aggregates(uuid, boolean, text)
   to service_role;
+
+
+
+
 

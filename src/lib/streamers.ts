@@ -20,6 +20,7 @@ export type StreamerRow = {
   rotation_mode: string;
   font_family: string;
   label_alignment: string;
+  board_labels: string;
 exclude_broadcaster_from_chat_messages: boolean;
   exclude_mods_from_chat_messages: boolean;
   created_at: string;
@@ -46,6 +47,7 @@ export function mapStreamerRow(row: StreamerRow): Streamer {
     rotationMode: row.rotation_mode as RotationMode,
     fontFamily: row.font_family,
     labelAlignment: row.label_alignment as LabelAlignment,
+    boardLabels: row.board_labels ? JSON.parse(row.board_labels) : {},
 excludeBroadcasterFromChatMessages: row.exclude_broadcaster_from_chat_messages,
     excludeModsFromChatMessages: row.exclude_mods_from_chat_messages,
     createdAt: row.created_at,
@@ -68,6 +70,7 @@ export function toOverlaySettings(streamer: Streamer): OverlaySettings {
     rotationMode: streamer.rotationMode,
     fontFamily: streamer.fontFamily,
     labelAlignment: streamer.labelAlignment,
+    boardLabels: streamer.boardLabels,
 excludeBroadcasterFromChatMessages: streamer.excludeBroadcasterFromChatMessages,
     excludeModsFromChatMessages: streamer.excludeModsFromChatMessages,
   };
@@ -89,6 +92,7 @@ export type StreamerSettingsRow = Pick<
   | "rotation_mode"
   | "font_family"
   | "label_alignment"
+  | "board_labels"
 | "exclude_broadcaster_from_chat_messages"
   | "exclude_mods_from_chat_messages"
 >;
@@ -111,6 +115,7 @@ export function settingsToRow(
     rotation_mode: settings.rotationMode,
     font_family: settings.fontFamily,
     label_alignment: settings.labelAlignment,
+    board_labels: JSON.stringify(settings.boardLabels),
 exclude_broadcaster_from_chat_messages: settings.excludeBroadcasterFromChatMessages,
     exclude_mods_from_chat_messages: settings.excludeModsFromChatMessages,
   };

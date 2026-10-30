@@ -8,9 +8,10 @@ export type BoardType =
   | "bits"
   | "subs"
   | "raiders"
-  
   | "chat_messages"
   | "clips";
+
+export type BoardLabels = Partial<Record<BoardType, string>>;
 
 export type ThemePreset = "midnight" | "ember" | "mint" | "grape" | "paper";
 
@@ -85,6 +86,7 @@ export type Streamer = {
   rotationMode: RotationMode;
   fontFamily: string;
   labelAlignment: LabelAlignment;
+  boardLabels: BoardLabels;
 excludeBroadcasterFromChatMessages: boolean;
   excludeModsFromChatMessages: boolean;
   createdAt: string;
@@ -106,6 +108,7 @@ export type OverlaySettings = Pick<
   | "rotationMode"
   | "fontFamily"
   | "labelAlignment"
+  | "boardLabels"
 | "excludeBroadcasterFromChatMessages"
   | "excludeModsFromChatMessages"
 >;
