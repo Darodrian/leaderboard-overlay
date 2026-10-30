@@ -76,6 +76,13 @@ export async function POST(
           throw new Error(`stream window reset failed: ${error.message}`);
         }
 
+        // End all active view sessions so new ones get created with the new window's start time.
+        await supabase
+          .from("view_sessions")
+          .update({ ended_at: now })
+          .eq("streamer_id", streamerId)
+          .is("ended_at", null);
+
         const { error: flushError } = await supabase.rpc(
           "flush_streamer_aggregates",
           { p_streamer_id: streamerId, p_force: true },

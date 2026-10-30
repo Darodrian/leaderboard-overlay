@@ -67,6 +67,12 @@ const FONT_OPTIONS: { key: string; label: string }[] = [
   { key: "Ubuntu", label: "Ubuntu" },
   { key: "Merriweather", label: "Merriweather" },
   { key: "Playfair Display", label: "Playfair Display" },
+  { key: "Press Start 2P", label: "Press Start 2P (Pixel)" },
+  { key: "VT323", label: "VT323 (Terminal)" },
+  { key: "Share Tech Mono", label: "Share Tech Mono" },
+  { key: "Special Elite", label: "Special Elite" },
+  { key: "Gagalin", label: "Gagalin" },
+  { key: "Permanent Marker", label: "Permanent Marker" },
 ];
 
 type Props = {
