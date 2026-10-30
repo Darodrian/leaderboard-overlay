@@ -1,5 +1,5 @@
-import type { BoardType, LeaderboardRow, OverlaySettings, WindowType } from "@/lib/types";
-import { BOARD_LABELS, formatBoardQuantity } from "@/lib/settings";
+﻿import type { BoardType, LeaderboardRow, OverlaySettings, WindowType } from "@/lib/types";
+import { formatBoardQuantity } from "@/lib/settings";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -26,15 +26,16 @@ export function Leaderboard({ rows, board, settings, window }: Props) {
   const max = Math.max(1, ...visible.map((row) => row.quantity));
   const showRankColumn = settings.display.ranks;
 
-  // Resolve board label: custom override > board default name
-  const boardLabel =
-    settings.boardLabels?.[board] ?? BOARD_LABELS[board];
+  // Format window name: replace underscores with spaces and capitalize words
+  const windowLabel = window
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
 
   return (
     <ol className="lb-list" data-window={window} data-board={board}>
       <header className="lb-board-header">
-        <span className="lb-board-label-main">{boardLabel}</span>
-        <span className="lb-board-label-sub">{window}</span>
+        <span className="lb-board-label-sub">{windowLabel}</span>
       </header>
       {visible.map((row, index) => {
         const rank = index + 1;
@@ -72,3 +73,4 @@ export function Leaderboard({ rows, board, settings, window }: Props) {
     </ol>
   );
 }
+
