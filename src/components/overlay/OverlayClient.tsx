@@ -4,7 +4,7 @@ import { useEffect, useState, type CSSProperties } from "react";
 import { Leaderboard } from "./Leaderboard";
 import { useLocalCache } from "@/hooks/useLocalCache";
 import { useOverlayRealtime } from "@/hooks/useOverlayRealtime";
-import { cssVars, BOARD_LABELS } from "@/lib/settings";
+import { cssVars } from "@/lib/settings";
 import type { BoardType, OverlayState, ScreenLayout, WindowType } from "@/lib/types";
 
 const WINDOW_LABELS: Record<WindowType, string> = {
@@ -190,7 +190,6 @@ export function OverlayClient({ token, initial }: Props) {
       >
         {state.settings.rotation.enabled && isSingle ? (
           <div className="lb-window mb-1">
-            {BOARD_LABELS[board]} â€” {WINDOW_LABELS[window]}
           </div>
         ) : null}
         {bs ? (
