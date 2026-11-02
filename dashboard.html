@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaderboard Overlay · Control</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./css/dashboard.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="col-left">
+    <div>
+      <h1>Leaderboard Overlay</h1>
+      <div class="status"><span class="dot" id="dot-ov"></span><span id="status-ov">No channel</span></div>
+      <div class="msg" id="msg" hidden></div>
+    </div>
+
+    <div id="connection-panel" class="panel">
+      <h2 id="connection-title">Connect Twitch</h2>
+      <button type="button" id="btn-connect">Connect Twitch account</button>
+      <div id="connection-connected" hidden>
+        <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+          <span id="connection-status">Connected</span>
+          <button type="button" id="btn-logout" style="margin-left:auto;">Disconnect</button>
+        </div>
+        <button type="button" id="btn-copy-url" disabled style="margin-top:8px;">Copy overlay URL</button>
+      </div>
+    </div>
+
+    <div id="license-section" hidden class="panel">
+      <h2>License</h2>
+      <p id="license-status" class="text-sm text-slate-300"></p>
+      <div id="license-form" class="space-y-2">
+        <label class="field">
+          <span>License key</span>
+          <input id="license-key" type="text" placeholder="XXXXXXXX-XXXXXXXX-XXXXXXXX" class="input">
+        </label>
+        <button type="button" id="btn-bind-license" class="btn btn-indigo">Bind license</button>
+      </div>
+      <p class="note">A key binds permanently to this Twitch account. Contact the seller if you need a transfer.</p>
+    </div>
+
+    <div id="obs-section" hidden class="panel">
+      <h2>OBS overlay URL</h2>
+      <code id="overlay-url" class="code"></code>
+      <div class="flex flex-wrap gap-2 mt-2">
+        <button type="button" id="btn-copy-url-obs" class="btn btn-indigo">Copy URL</button>
+        <button type="button" id="btn-regen-token" class="btn btn-rose">Regenerate token</button>
+      </div>
+      <p class="note">Paste this into an OBS Browser Source at 1280×720 with a transparent background.</p>
+    </div>
+
+    <div id="settings-section" hidden class="panel">
+      <h2>Settings</h2>
+      <button type="button" id="btn-open-settings" class="btn btn-indigo">Open settings editor</button>
+      <p class="note">Configure boards, points, themes, rotation, and layout.</p>
+    </div>
+  </div>
+
+  <div class="col-right">
+    <div class="panel panel-preview">
+      <h2>Preview</h2>
+      <div id="preview-shell"><iframe id="preview" title="Overlay preview" hidden></iframe></div>
+      <p class="note" id="preview-note">Connect your Twitch account to preview the overlay that goes into OBS.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="./js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,77 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
+
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const CHAT_BOT_SECRET = Deno.env.get('CHAT_BOT_SECRET');
+
+export async function handler(request) {
+  const url = new URL(request.url);
+  const token = url.pathname.split('/').pop();
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { data: streamer } = await supabase
+    .from('streamers')
+    .select('*')
+    .eq('obs_token', token)
+    .maybeSingle();
+
+  if (!streamer) {
+    return new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const userId = typeof body?.userId === 'string' ? body.userId.trim() : '';
+  const username = typeof body?.username === 'string' ? body.username.trim() : '';
+  const isBot = body?.isBot === true;
+  const isBroadcaster = body?.isBroadcaster === true;
+  const isMod = body?.isMod === true;
+
+  if (!userId || !username) {
+    return new Response(JSON.stringify({ error: 'userId and username required' }), { status: 400 });
+  }
+
+  const shouldCount =
+    !(streamer.exclude_broadcaster_from_chat_messages && isBroadcaster) &&
+    !(streamer.exclude_mods_from_chat_messages && isMod);
+
+  if (shouldCount) {
+    const { error } = await supabase.from('chat_events').insert({
+      streamer_id: streamer.id,
+      twitch_user_id: userId,
+      username,
+      is_bot: isBot,
+      is_broadcaster: isBroadcaster,
+      is_mod: isMod,
+    });
+    if (error) return new Response(JSON.stringify({ error: 'chat event failed' }), { status: 500 });
+  }
+
+  await supabase.rpc('flush_streamer_aggregates', {
+    p_streamer_id: streamer.id,
+    p_force: true,
+    p_board_type: null,
+  });
+
+  try {
+    await fetch(`${SUPABASE_URL}/realtime/v1/api/broadcast`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+      },
+      body: JSON.stringify({
+        messages: [{
+          topic: `overlay:${streamer.obs_token}`,
+          event: 'leaderboard.update',
+          payload: { type: 'leaderboard.update', streamerId: streamer.id, window: 'this_stream' },
+        }],
+      }),
+    });
+  } catch { /* non-fatal */ }
+
+  return new Response(null, { status: 204 });
+}

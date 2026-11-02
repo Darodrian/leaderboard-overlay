@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaderboard Overlay</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="./css/overlay.css">
+<script src="https://cdn.jsdelivr.net/npm/comfy.js@0.0.12/dist/comfy.min.js"></script>
+</head>
+<body>
+<div id="setup-notice" hidden>
+  <div class="setup-box">
+    <h1>Leaderboard Overlay</h1>
+    <p>No streamer found for this token. Bind a license from the dashboard first.</p>
+  </div>
+</div>
+<div id="overlay-root"></div>
+
+<script type="module">
+import { loadOverlayState, FUNCTIONS_BASE } from './js/overlayData.js';
+import { initComfyJS, disconnectComfyJS } from './js/comfyjs.js';
+import { cssVars, BOARD_LABELS, formatBoardQuantity, ALL_BOARD_TYPES } from './js/settings.js';
+
+const token = (() => {
+  try { return new URLSearchParams(location.search).get('token') || ''; } catch { return ''; }
+})();
+
+const root = document.getElementById('overlay-root');
+const setupNotice = document.getElementById('setup-notice');
+
+let state = null;
+let settings = null;
+let rotationTimer = null;
+
+function applyCssVars(s) {
+  const vars = cssVars(s);
+  for (const [key, value] of Object.entries(vars)) {
+    document.documentElement.style.setProperty(key, value);
+  }
+  if (s.fontFamily !== 'system') {
+    let link = document.getElementById('google-fonts');
+    if (link) link.remove();
+    const l = document.createElement('link');
+    l.id = 'google-fonts';
+    l.rel = 'stylesheet';
+    l.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(s.fontFamily)}:wght@400;700&display=swap`;
+    document.head.appendChild(l);
+  }
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function renderBoard(board, rows, window) {
+  const hidden = new Set(settings.hiddenAccounts.map((a) => a.toLowerCase()));
+  const boardCfg = settings.boards[board];
+  const rankCount = boardCfg ? boardCfg.rankCount : 25;
+
+  const visible = [...rows]
+    .filter((row) => !hidden.has(row.username.toLowerCase()))
+    .sort((a, b) => b.quantity - a.quantity)
+    .slice(0, rankCount);
+
+  const max = Math.max(1, ...visible.map((row) => row.quantity));
+  const showRank = settings.display.ranks;
+  const boardLabel = settings.boardLabels ? (settings.boardLabels[board] || BOARD_LABELS[board]) : BOARD_LABELS[board];
+  const windowLabel = window.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+
+  const itemsHtml = visible.map((row, index) => {
+    const rank = index + 1;
+    const showMedal = showRank && settings.display.medals && rank <= 3;
+    const medal = showMedal ? ['🥇','🥈','🥉'][rank - 1] : '';
+    const rankNum = showRank && settings.display.rankNumbers ? '#' + rank : '';
+    const qty = settings.display.amounts ? formatBoardQuantity(board, row.quantity) : '';
+    const bar = settings.display.bars ? '<span class="lb-bar"><span class="lb-bar-fill" style="width:' + Math.max(2, (row.quantity / max) * 100) + '%"></span></span>' : '';
+
+    return '<li class="lb-row" data-rank="' + rank + '">' +
+      (showMedal ? '<span class="lb-medal" aria-hidden>' + medal + '</span>' : '') +
+      (showRank && settings.display.rankNumbers ? '<span class="lb-rank">' + rankNum + '</span>' : '') +
+      '<span class="lb-name">' + escapeHtml(row.username) + '</span>' +
+      (settings.display.amounts ? '<span class="lb-quantity">' + qty + '</span>' : '') +
+      (settings.display.bars ? bar : '') +
+      '</li>';
+  }).join('');
+
+  return '<div class="lb-board">' +
+    '<header class="lb-board-header">' +
+    '<span class="lb-board-label-main">' + escapeHtml(boardLabel) + '</span>' +
+    '<span class="lb-board-label-sub">' + escapeHtml(windowLabel) + '</span>' +
+    '</header>' +
+    '<ol class="lb-list" data-window="' + window + '" data-board="' + board + '">' +
+    itemsHtml +
+    '</ol>' +
+    '</div>';
+}
+
+function render() {
+  if (!state) return;
+  settings = state.settings;
+  applyCssVars(settings);
+
+  const activeBoards = Object.entries(state.settings.boards).filter(([, cfg]) => cfg.active);
+  const boardTypes = activeBoards.map(([bt]) => bt);
+
+  const isSingle = state.settings.screenLayout === 'single';
+
+  let currentBoard = state.activeBoard;
+  let currentWindow = state.activeWindow;
+
+  if (isSingle) {
+    const bs = state.boards[currentBoard];
+    const boardRows = bs ? bs.rows : [];
+    root.innerHTML = '<div class="lb-panel">' + renderBoard(currentBoard, boardRows, currentWindow) + '</div>';
+  } else {
+    const boardsHtml = boardTypes.map((board) => {
+      const bs = state.boards[board];
+      const boardRows = bs ? bs.rows : [];
+      return renderBoard(board, boardRows, state.activeWindow);
+    }).join('');
+    const layoutClass = state.settings.screenLayout === 'side-by-side' ? 'lb-layout-side-by-side' : 'lb-layout-stacked';
+    root.innerHTML = '<div class="' + layoutClass + '">' + boardsHtml + '</div>';
+  }
+
+  startRotation();
+}
+
+function startRotation() {
+  if (rotationTimer !== null) {
+    clearInterval(rotationTimer);
+    rotationTimer = null;
+  }
+  if (!state) return;
+  const isSingle = state.settings.screenLayout === 'single';
+  if (!isSingle || !state.settings.rotation.enabled) return;
+
+  const activeBoards = Object.entries(state.settings.boards).filter(([, cfg]) => cfg.active);
+  const boardTypes = activeBoards.map(([bt]) => bt);
+  if (boardTypes.length === 0) return;
+
+  let bi = boardTypes.indexOf(state.activeBoard);
+  if (bi === -1) bi = 0;
+
+  const intervalMs = state.settings.rotation.intervalMs;
+  rotationTimer = window.setInterval(() => {
+    const s = state.settings;
+    let nextBoard = boardTypes[bi];
+    let nextWindow = state.activeWindow;
+
+    if (s.rotationMode === 'boards' || s.rotationMode === 'both') {
+      bi = bi === boardTypes.length - 1 ? 0 : bi + 1;
+      nextBoard = boardTypes[bi];
+      const bs = state.boards[nextBoard];
+      nextWindow = bs ? bs.window : nextWindow;
+    }
+
+    if (s.rotationMode === 'windows' || s.rotationMode === 'both') {
+      if (s.rotationMode === 'windows') {
+        nextBoard = boardTypes[bi];
+      }
+      const boardWindows = s.boards[nextBoard] ? s.boards[nextBoard].windows : ['this_stream'];
+      const wi = boardWindows.indexOf(nextWindow);
+      const nextWi = wi === -1 || wi === boardWindows.length - 1 ? 0 : wi + 1;
+      nextWindow = boardWindows[nextWi];
+    }
+
+    const bs = state.boards[nextBoard];
+    const boardRows = bs ? bs.rows : [];
+    root.innerHTML = '<div class="lb-panel">' + renderBoard(nextBoard, boardRows, nextWindow) + '</div>';
+  }, intervalMs);
+}
+
+function startComfyJS() {
+  if (!state) return;
+  const channel = '#' + (state.settings.twitchLogin || '');
+  initComfyJS(channel, {
+    onMessage: async (msg) => {
+      try {
+        await fetch(FUNCTIONS_BASE + '/webhooks-chat/' + token, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: msg.userId,
+            username: msg.username,
+            isBot: msg.isBot,
+            isBroadcaster: msg.isBroadcaster,
+            isMod: msg.isMod,
+          }),
+        });
+      } catch (e) {
+        console.warn('[comfyjs] chat event failed', e);
+      }
+    },
+    onConnect: () => console.log('[comfyjs] connected to', channel),
+    onDisconnect: () => console.warn('[comfyjs] disconnected'),
+  }).catch((e) => console.warn('[comfyjs] init failed', e));
+}
+
+async function main() {
+  if (!token) {
+    setupNotice.hidden = false;
+    return;
+  }
+
+  state = await loadOverlayState(token);
+  if (!state) {
+    setupNotice.hidden = false;
+    return;
+  }
+
+  setupNotice.hidden = true;
+  render();
+  startComfyJS();
+}
+
+main();
+</script>
+</body>
+</html>
