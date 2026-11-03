@@ -131,10 +131,25 @@ async function loadSettings() {
 
 // ---- Connect Twitch ----
 if (BTN_CONNECT) {
-  BTN_CONNECT.addEventListener('click', () => {
+  BTN_CONNECT.addEventListener('click', async () => {
     const redirect = new URL('.', location.href).href;
     const authUrl = `${FUNCTIONS_BASE}/auth-twitch?redirect=${encodeURIComponent(redirect)}`;
-    location.href = authUrl;
+    try {
+      const res = await fetch(authUrl, {
+        method: 'GET',
+        redirect: 'manual',
+        credentials: 'include',
+        headers: { apikey: SUPABASE_ANON_KEY },
+      });
+      const twitchUrl = res.headers.get('location');
+      if (twitchUrl) {
+        location.href = twitchUrl;
+      } else {
+        flash('Twitch login failed', 'err');
+      }
+    } catch (e) {
+      flash('Twitch login failed', 'err');
+    }
   });
 }
 
