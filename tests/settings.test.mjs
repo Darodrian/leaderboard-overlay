@@ -50,6 +50,17 @@ test('applySettings keeps anonymous mask non-empty and trimmed', () => {
   );
 });
 
+test('applySettings normalizes hidden accounts to a trimmed string array', () => {
+  assert.deepStrictEqual(
+    applySettings(DEFAULT_SETTINGS, { hiddenAccounts: ' alice, bob ' }).hiddenAccounts,
+    []
+  );
+  assert.deepStrictEqual(
+    applySettings(DEFAULT_SETTINGS, { hiddenAccounts: [' alice ', 42, '', 'bob', null] }).hiddenAccounts,
+    ['alice', 'bob']
+  );
+});
+
 test('applySettings drops theme overrides that are not CSS custom properties', () => {
   const overrides = JSON.parse('{"--lb-bg":"#123456","color":"red","__proto__":{"polluted":true}}');
   const settings = applySettings(DEFAULT_SETTINGS, { theme: { overrides } });

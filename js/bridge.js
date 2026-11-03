@@ -1,83 +1,108 @@
-// Supabase Realtime broadcast channel for panel <-> overlay sync.
-// Mirrors the bridge.js pattern from miguelium-wisdom / goal-overlay.
-import { cfg } from './config.js';
+// Supabase Realtime broadcast bridge, same pattern as goal-overlay / miguelium-wisdom.
+// The dashboard and the overlay join the same room; the dashboard pushes the
+// full settings object and the overlay applies it locally, with no polling.
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from './config.js';
 
-const SUPA_URL = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
+const SUPABASE_MODULE = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/+esm';
 
-export function createBridge(room: string) {
-  const handlers = {
-    status: [], hello: [], ping: [], set: [], flip: [], test: [], disconnect: [],
-  };
-  let channel: any = null;
-  let client: any = null;
+const EVENTS = [
+  'hello',
+  'settings.update',
+  'leaderboard.update',
+  'command.refresh',
+  'command.clear-stream',
+];
+
+export function createBridge(room) {
+  const handlers = new Map();
+  let channel = null;
+  let client = null;
+  let subscribed = false;
+  let connectPromise = null;
+
+  function on(event, fn) {
+    if (!handlers.has(event)) handlers.set(event, new Set());
+    handlers.get(event).add(fn);
+  }
+
+  function emit(event, payload) {
+    const set = handlers.get(event);
+    if (!set) return;
+    for (const fn of set) {
+      try { fn(payload); } catch (e) { console.warn('[bridge] handler failed', event, e); }
+    }
+  }
 
   async function getClient() {
     if (!client) {
-      const mod = await import(SUPA_URL);
-      client = mod.createClient(cfg.supabaseUrl, cfg.supabaseKey);
+      const mod = await import(SUPABASE_MODULE);
+      client = mod.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: false, autoRefreshToken: false },
+      });
     }
     return client;
   }
 
-  function listen(event: string, fn: (p: Record<string, unknown>) => void) {
-    channel.on('broadcast', { event }, (msg: any) => fn((msg && msg.payload) || {}));
-  }
+  function connect() {
+    if (subscribed) return Promise.resolve();
+    if (connectPromise) return connectPromise;
 
-  async function connect() {
-    const c = await getClient();
-    channel = c.channel(room, { config: { broadcast: { self: false } } });
-    listen('hello', (p) => handlers.hello.forEach((h) => h(p)));
-    listen('ping', (p) => handlers.ping.forEach((h) => h(p)));
-    listen('set', (p) => handlers.set.forEach((h) => h(p)));
-    listen('flip', (p) => handlers.flip.forEach((h) => h(p)));
-    listen('test', (p) => handlers.test.forEach((h) => h(p)));
-    listen('disconnect', (p) => handlers.disconnect.forEach((h) => h(p)));
-    return new Promise((resolve, reject) => {
-      let settled = false;
-      const finish = (fn: any, arg: any) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        fn(arg);
-      };
-      const timer = setTimeout(() => finish(reject, new Error('TIMED_OUT')), 15000);
-      channel.subscribe((status: string) => {
-        handlers.status.forEach((h) => h(status));
-        if (status === 'SUBSCRIBED') finish(resolve);
-        else if (status === 'CHANNEL_ERROR' || status === 'CLOSED') finish(reject, new Error(status));
+    connectPromise = (async () => {
+      const c = await getClient();
+      channel = c.channel(room, { config: { broadcast: { self: false } } });
+
+      for (const event of EVENTS) {
+        channel.on('broadcast', { event }, (msg) => emit(event, (msg && msg.payload) || {}));
+      }
+
+      return new Promise((resolve, reject) => {
+        let settled = false;
+        const finish = (fn, arg) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          fn(arg);
+        };
+        const timer = setTimeout(() => finish(reject, new Error('TIMED_OUT')), 15000);
+
+        channel.subscribe((status) => {
+          emit('status', status);
+          if (status === 'SUBSCRIBED') {
+            subscribed = true;
+            finish(resolve);
+          } else if (status === 'CHANNEL_ERROR' || status === 'CLOSED' || status === 'TIMED_OUT') {
+            subscribed = false;
+            finish(reject, new Error(status));
+          }
+        });
       });
+    })().finally(() => {
+      connectPromise = null;
     });
+
+    return connectPromise;
   }
 
-  function send(type: string, payload: Record<string, unknown>) {
+  function send(event, payload) {
     if (!channel) return;
-    channel.send({ type: 'broadcast', event: type, payload });
+    channel.send({ type: 'broadcast', event, payload });
+  }
+
+  async function leave() {
+    const ch = channel;
+    channel = null;
+    subscribed = false;
+    if (ch && client) {
+      try { await client.removeChannel(ch); } catch { /* already gone */ }
+    }
   }
 
   return {
     connect,
-    async leave() {
-      if (channel && client) await client.removeChannel(channel);
-      channel = null;
-    },
-    sendHello() { send('hello', { at: Date.now() }); },
-    sendPing() { send('ping', { at: Date.now() }); },
-    sendSet(payload: Record<string, unknown> | number) {
-      if (typeof payload === 'number') {
-        send('set', { amount: Math.max(1, Math.floor(Number(payload) || 100)) });
-      } else {
-        send('set', payload);
-      }
-    },
-    sendFlip(flip: boolean) { send('flip', { flip: !!flip }); },
-    sendTest() { send('test', { at: Date.now() }); },
-    sendDisconnect() { send('disconnect', { at: Date.now() }); },
-    onStatus(fn: (s: string) => void) { handlers.status.push(fn); },
-    onHello(fn: (p: Record<string, unknown>) => void) { handlers.hello.push(fn); },
-    onPing(fn: (p: Record<string, unknown>) => void) { handlers.ping.push(fn); },
-    onSet(fn: (p: Record<string, unknown>) => void) { handlers.set.push(fn); },
-    onFlip(fn: (p: { flip: boolean }) => void) { handlers.flip.push(fn); },
-    onTest(fn: (p: Record<string, unknown>) => void) { handlers.test.push(fn); },
-    onDisconnect(fn: (p: Record<string, unknown>) => void) { handlers.disconnect.push(fn); },
+    leave,
+    send,
+    on,
+    isConnected: () => subscribed,
+    sendHello(payload = { at: Date.now() }) { send('hello', payload); },
   };
 }

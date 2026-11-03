@@ -15,12 +15,13 @@
     <p>No streamer found for this token. Connect your Twitch account from the dashboard.</p>
   </div>
 </div>
-<div id="overlay-root"></div>
+<div id="overlay-root" class="lb-root"></div>
 
 <script type="module">
 import { loadOverlayState, FUNCTIONS_BASE, SUPABASE_ANON_KEY } from './js/overlayData.js';
-import { initComfyJS, disconnectComfyJS } from './js/comfyjs.js';
-import { cssVars, BOARD_LABELS, formatBoardQuantity, ALL_BOARD_TYPES } from './js/settings.js';
+import { initComfyJS } from './js/comfyjs.js';
+import { createBridge } from './js/bridge.js';
+import { cssVars, mergeSettings, BOARD_LABELS, formatBoardQuantity } from './js/settings.js';
 
 const token = (() => {
   try { return new URLSearchParams(location.search).get('token') || ''; } catch { return ''; }
@@ -31,7 +32,12 @@ const setupNotice = document.getElementById('setup-notice');
 
 let state = null;
 let settings = null;
+let bridge = null;
 let rotationTimer = null;
+let rotationSignature = '';
+let refreshTimer = null;
+let activeBoard = '';
+let activeWindow = '';
 
 function applyCssVars(s) {
   const vars = cssVars(s);
@@ -103,25 +109,21 @@ function render() {
   settings = state.settings;
   applyCssVars(settings);
 
-  const activeBoards = Object.entries(state.settings.boards).filter(([, cfg]) => cfg.active);
-  const boardTypes = activeBoards.map(([bt]) => bt);
+  if (!state.boards[activeBoard]) activeBoard = state.activeBoard;
+  if (!activeWindow) activeWindow = state.activeWindow;
 
-  const isSingle = state.settings.screenLayout === 'single';
-
-  let currentBoard = state.activeBoard;
-  let currentWindow = state.activeWindow;
-
-  if (isSingle) {
-    const bs = state.boards[currentBoard];
+  if (settings.screenLayout === 'single') {
+    const bs = state.boards[activeBoard];
     const boardRows = bs ? bs.rows : [];
-    root.innerHTML = '<div class="lb-panel">' + renderBoard(currentBoard, boardRows, currentWindow) + '</div>';
+    root.innerHTML = '<div class="lb-panel">' + renderBoard(activeBoard, boardRows, activeWindow) + '</div>';
   } else {
-    const boardsHtml = boardTypes.map((board) => {
+    const activeBoards = Object.entries(settings.boards).filter(([, cfg]) => cfg.active);
+    const boardsHtml = activeBoards.map(([board]) => {
       const bs = state.boards[board];
       const boardRows = bs ? bs.rows : [];
-      return renderBoard(board, boardRows, state.activeWindow);
+      return renderBoard(board, boardRows, activeWindow);
     }).join('');
-    const layoutClass = state.settings.screenLayout === 'side-by-side' ? 'lb-layout-side-by-side' : 'lb-layout-stacked';
+    const layoutClass = settings.screenLayout === 'side-by-side' ? 'lb-layout-side-by-side' : 'lb-layout-stacked';
     root.innerHTML = '<div class="' + layoutClass + '">' + boardsHtml + '</div>';
   }
 
@@ -129,37 +131,47 @@ function render() {
 }
 
 function startRotation() {
+  if (!state) return;
+
+  const activeBoards = Object.entries(state.settings.boards)
+    .filter(([, cfg]) => cfg.active)
+    .map(([board]) => board);
+  const signature = [
+    state.settings.screenLayout,
+    state.settings.rotation.enabled,
+    state.settings.rotation.intervalMs,
+    state.settings.rotationMode,
+    activeBoards.join(','),
+  ].join('|');
+
+  if (rotationTimer !== null && signature === rotationSignature) return;
+  rotationSignature = signature;
+
   if (rotationTimer !== null) {
     clearInterval(rotationTimer);
     rotationTimer = null;
   }
-  if (!state) return;
-  const isSingle = state.settings.screenLayout === 'single';
-  if (!isSingle || !state.settings.rotation.enabled) return;
+  if (state.settings.screenLayout !== 'single' || !state.settings.rotation.enabled || activeBoards.length === 0) return;
 
-  const activeBoards = Object.entries(state.settings.boards).filter(([, cfg]) => cfg.active);
-  const boardTypes = activeBoards.map(([bt]) => bt);
-  if (boardTypes.length === 0) return;
-
-  let bi = boardTypes.indexOf(state.activeBoard);
+  let bi = activeBoards.indexOf(activeBoard);
   if (bi === -1) bi = 0;
 
   const intervalMs = state.settings.rotation.intervalMs;
   rotationTimer = window.setInterval(() => {
     const s = state.settings;
-    let nextBoard = boardTypes[bi];
-    let nextWindow = state.activeWindow;
+    let nextBoard = activeBoards[bi];
+    let nextWindow = activeWindow;
 
     if (s.rotationMode === 'boards' || s.rotationMode === 'both') {
-      bi = bi === boardTypes.length - 1 ? 0 : bi + 1;
-      nextBoard = boardTypes[bi];
+      bi = bi === activeBoards.length - 1 ? 0 : bi + 1;
+      nextBoard = activeBoards[bi];
       const bs = state.boards[nextBoard];
       nextWindow = bs ? bs.window : nextWindow;
     }
 
     if (s.rotationMode === 'windows' || s.rotationMode === 'both') {
       if (s.rotationMode === 'windows') {
-        nextBoard = boardTypes[bi];
+        nextBoard = activeBoards[bi];
       }
       const boardWindows = s.boards[nextBoard] ? s.boards[nextBoard].windows : ['this_stream'];
       const wi = boardWindows.indexOf(nextWindow);
@@ -167,9 +179,10 @@ function startRotation() {
       nextWindow = boardWindows[nextWi];
     }
 
-    const bs = state.boards[nextBoard];
-    const boardRows = bs ? bs.rows : [];
-    root.innerHTML = '<div class="lb-panel">' + renderBoard(nextBoard, boardRows, nextWindow) + '</div>';
+    activeBoard = nextBoard;
+    activeWindow = nextWindow;
+    const bs = state.boards[activeBoard];
+    root.innerHTML = '<div class="lb-panel">' + renderBoard(activeBoard, bs ? bs.rows : [], activeWindow) + '</div>';
   }, intervalMs);
 }
 
@@ -199,21 +212,72 @@ function startComfyJS() {
   }).catch((e) => console.warn('[comfyjs] init failed', e));
 }
 
+function applyState(next) {
+  if (!next) return;
+  state = next;
+  state.settings = mergeSettings(state.settings || {});
+  render();
+}
+
+function applyLiveSettings(payload) {
+  if (!state || !payload || !payload.settings) return;
+  state.settings = mergeSettings(payload.settings);
+  render();
+}
+
+function scheduleRefresh() {
+  clearTimeout(refreshTimer);
+  refreshTimer = setTimeout(refresh, 400);
+}
+
+async function refresh() {
+  try {
+    const next = await loadOverlayState(token);
+    if (next) applyState(next);
+  } catch (e) {
+    console.warn('[overlay] refresh failed', e?.message ?? e);
+  }
+}
+
+async function startLive() {
+  const live = createBridge('overlay:' + token);
+  live.on('settings.update', applyLiveSettings);
+  live.on('leaderboard.update', scheduleRefresh);
+  live.on('command.refresh', scheduleRefresh);
+  live.on('command.clear-stream', scheduleRefresh);
+  live.on('status', (status) => {
+    if (status === 'SUBSCRIBED') live.sendHello();
+  });
+
+  try {
+    await live.connect();
+    bridge = live;
+    live.sendHello();
+  } catch (e) {
+    console.warn('[overlay] live updates unavailable', e?.message ?? e);
+  }
+}
+
 async function main() {
   if (!token) {
     setupNotice.hidden = false;
     return;
   }
 
-  state = await loadOverlayState(token);
-  if (!state) {
+  try {
+    const next = await loadOverlayState(token);
+    if (!next) {
+      setupNotice.hidden = false;
+      return;
+    }
+    setupNotice.hidden = true;
+    applyState(next);
+    startComfyJS();
+    startLive();
+  } catch (e) {
+    console.warn('[overlay] load failed', e?.message ?? e);
     setupNotice.hidden = false;
-    return;
   }
-
-  setupNotice.hidden = true;
-  render();
-  startComfyJS();
 }
 
 main();

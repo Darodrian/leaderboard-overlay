@@ -1,4 +1,10 @@
 /* OBS overlay */
+html, body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
 .lb-root {
   width: var(--lb-width, 420px);
   font-size: var(--lb-font-size, 18px);

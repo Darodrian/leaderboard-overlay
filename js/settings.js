@@ -100,6 +100,13 @@ function clampSettings(settings) {
   const mask = typeof settings.anonymousMaskName === 'string' ? settings.anonymousMaskName.trim() : '';
   settings.anonymousMaskName = mask || 'Anonymous';
 
+  settings.hiddenAccounts = Array.isArray(settings.hiddenAccounts)
+    ? settings.hiddenAccounts
+        .filter((account) => typeof account === 'string')
+        .map((account) => account.trim())
+        .filter(Boolean)
+    : [];
+
   if (
     settings.screenLayout !== 'single' &&
     settings.screenLayout !== 'side-by-side' &&
