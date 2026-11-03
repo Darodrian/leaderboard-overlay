@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
 
-const SUPABASE_URL = Deno.env.get('BASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY');
+const SUPABASE_URL = Deno.env.get('BASE_URL') || Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const CHAT_BOT_SECRET = Deno.env.get('CHAT_BOT_SECRET');
 
 const ALLOWED_ORIGINS = (Deno.env.get('CORS_ORIGINS') || '*').split(',').map(s => s.trim())
@@ -97,3 +97,5 @@ export async function handler(request) {
 
   return new Response(null, { status: 204, headers: corsHeaders(origin) });
 }
+
+Deno.serve(handler);

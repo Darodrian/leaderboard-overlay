@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
 
-const SUPABASE_URL = Deno.env.get('BASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY');
+const SUPABASE_URL = Deno.env.get('BASE_URL') || Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const TOKEN_ENCRYPTION_KEY = Deno.env.get('TOKEN_ENCRYPTION_KEY');
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const COOKIE_NAME = 'lb_session';
@@ -26,6 +26,13 @@ function corsHeaders(origin) {
 function getCookie(cookieHeader, name) {
   const match = cookieHeader.match(new RegExp('(^|; )' + name + '=([^;]+)'));
   return match ? decodeURIComponent(match[2]) : null;
+}
+
+function getBearerToken(request) {
+  const header = request.headers.get('authorization') || '';
+  return header.toLowerCase().startsWith('bearer ')
+    ? header.slice(7).trim()
+    : null;
 }
 
 async function verifySession(token, secret, now = Date.now()) {
@@ -62,7 +69,9 @@ export async function handler(request) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const token = getCookie(request.headers.get('cookie') || '', COOKIE_NAME);
+  const token =
+    getBearerToken(request) ||
+    getCookie(request.headers.get('cookie') || '', COOKIE_NAME);
   if (!token || !TOKEN_ENCRYPTION_KEY) {
     return new Response(JSON.stringify({ error: 'unauthorized' }), {
       status: 401,
@@ -93,3 +102,5 @@ export async function handler(request) {
     { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
   );
 }
+
+Deno.serve(handler);

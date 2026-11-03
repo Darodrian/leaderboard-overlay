@@ -33,3 +33,5 @@ export async function handler(request) {
   );
   return response;
 }
+
+Deno.serve(handler);

@@ -1,12 +1,13 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
 
-const SUPABASE_URL = Deno.env.get('BASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY');
+const SUPABASE_URL = Deno.env.get('BASE_URL') || Deno.env.get('SUPABASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 const TOKEN_ENCRYPTION_KEY = Deno.env.get('TOKEN_ENCRYPTION_KEY');
 const TWITCH_CLIENT_ID = Deno.env.get('TWITCH_CLIENT_ID');
 const TWITCH_CLIENT_SECRET = Deno.env.get('TWITCH_CLIENT_SECRET');
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
 const OAUTH_STATE_COOKIE = 'twitch_oauth_state';
+const OAUTH_STATE_MAX_AGE = 600;
 
 const AUTHORIZE_URL = 'https://id.twitch.tv/oauth2/authorize';
 const TOKEN_URL = 'https://id.twitch.tv/oauth2/token';
@@ -72,6 +73,52 @@ async function encryptToken(plain, keyBase64) {
   ].join('.');
 }
 
+function fallbackDashboardUrl(requestUrl) {
+  return Deno.env.get('DASHBOARD_URL') || Deno.env.get('APP_URL') || `${requestUrl.origin}/`;
+}
+
+function sanitizeDashboard(value, requestUrl) {
+  if (value) {
+    try {
+      const parsed = new URL(value);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.toString();
+    } catch { /* not a URL, fall back */ }
+  }
+  return fallbackDashboardUrl(requestUrl);
+}
+
+// The dashboard origin travels inside `state` so Twitch's redirect_uri can stay
+// fixed on this function.
+function dashboardBaseFromState(state, requestUrl) {
+  if (state) {
+    const sep = state.indexOf('|');
+    if (sep !== -1) {
+      try {
+        const value = decodeURIComponent(state.slice(sep + 1));
+        if (/^https?:\/\//i.test(value)) return value;
+      } catch { /* malformed state, fall through */ }
+    }
+  }
+  return fallbackDashboardUrl(requestUrl);
+}
+
+function dashboardTarget(base, params = {}) {
+  const dir = base.endsWith('/') ? base : base + '/';
+  const target = new URL('dashboard.html', dir);
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      target.searchParams.set(key, value);
+    }
+  }
+  return target;
+}
+
+function redirectTo(location, cookies = []) {
+  const headers = new Headers({ Location: location.toString() });
+  for (const cookie of cookies) headers.append('Set-Cookie', cookie);
+  return new Response(null, { status: 302, headers });
+}
+
 export async function handler(request) {
   const url = new URL(request.url);
   const origin = request.headers.get('origin') || '*'
@@ -84,26 +131,28 @@ export async function handler(request) {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  // ---- Callback: Twitch redirects back with ?code and ?state ----
+  const oauthError = url.searchParams.get('error');
   const code = url.searchParams.get('code');
   const incomingState = url.searchParams.get('state');
 
-  if (code) {
+  // ---- Callback: Twitch redirects back with ?code and ?state ----
+  if (code || oauthError) {
+    const dashboardBase = dashboardBaseFromState(incomingState, url);
     const cookieHeader = request.headers.get('cookie') || '';
     const storedState = getCookie(cookieHeader, OAUTH_STATE_COOKIE);
+    const clearStateCookie =
+      `${OAUTH_STATE_COOKIE}=; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=0`;
 
-    if (!code || !incomingState || !storedState || incomingState !== storedState) {
-      return new Response(null, {
-        status: 302,
-        headers: { Location: '/?error=twitch_login_failed', ...corsHeaders(origin) },
-      });
+    if (oauthError) {
+      return redirectTo(dashboardTarget(dashboardBase, { error: oauthError }), [clearStateCookie]);
+    }
+
+    if (!incomingState || !storedState || incomingState !== storedState) {
+      return redirectTo(dashboardTarget(dashboardBase, { error: 'twitch_state_mismatch' }), [clearStateCookie]);
     }
 
     if (!TWITCH_CLIENT_ID || !TWITCH_CLIENT_SECRET || !TOKEN_ENCRYPTION_KEY) {
-      return new Response(null, {
-        status: 302,
-        headers: { Location: '/?error=twitch_not_configured', ...corsHeaders(origin) },
-      });
+      return redirectTo(dashboardTarget(dashboardBase, { error: 'twitch_not_configured' }), [clearStateCookie]);
     }
 
     const redirectUri =
@@ -124,10 +173,8 @@ export async function handler(request) {
       });
 
       if (!tokenRes.ok) {
-        return new Response(null, {
-          status: 302,
-          headers: { Location: '/?error=twitch_login_failed', ...corsHeaders(origin) },
-        });
+        console.error('[auth-twitch] token exchange failed', tokenRes.status, await tokenRes.text());
+        return redirectTo(dashboardTarget(dashboardBase, { error: 'twitch_login_failed' }), [clearStateCookie]);
       }
 
       const tokens = await tokenRes.json();
@@ -141,29 +188,29 @@ export async function handler(request) {
       const userJson = await userRes.json();
       const user = userJson.data?.[0];
       if (!user?.id) {
-        return new Response(null, {
-          status: 302,
-          headers: { Location: '/?error=twitch_login_failed', ...corsHeaders(origin) },
-        });
+        console.error('[auth-twitch] user lookup failed', userJson);
+        return redirectTo(dashboardTarget(dashboardBase, { error: 'twitch_login_failed' }), [clearStateCookie]);
       }
 
       const encryptedToken = await encryptToken(tokens.access_token, TOKEN_ENCRYPTION_KEY);
 
       let streamerId;
-      const { data: existing } = await supabase
+      const { data: existing, error: lookupError } = await supabase
         .from('streamers')
         .select('id')
         .eq('twitch_user_id', user.id)
         .maybeSingle();
+      if (lookupError) throw lookupError;
 
       if (existing) {
-        await supabase
+        const { error: updateError } = await supabase
           .from('streamers')
           .update({ twitch_login: user.login, access_token: encryptedToken })
           .eq('id', existing.id);
+        if (updateError) throw updateError;
         streamerId = existing.id;
       } else {
-        const { data: created } = await supabase
+        const { data: created, error: insertError } = await supabase
           .from('streamers')
           .insert({
             twitch_user_id: user.id,
@@ -173,6 +220,7 @@ export async function handler(request) {
           })
           .select('id')
           .single();
+        if (insertError) throw insertError;
         streamerId = created.id;
       }
 
@@ -181,28 +229,19 @@ export async function handler(request) {
         TOKEN_ENCRYPTION_KEY
       );
 
-      const dashboardUrl = new URL('/dashboard.html', url.origin);
-      dashboardUrl.searchParams.set('connected', user.login);
-      dashboardUrl.searchParams.set('broadcaster_id', streamerId);
+      const target = dashboardTarget(dashboardBase, {
+        connected: user.login,
+        broadcaster_id: streamerId,
+      });
+      target.hash = 'session=' + encodeURIComponent(sessionToken);
 
-      const response = new Response(null, {
-        status: 302,
-        headers: { Location: dashboardUrl.toString(), ...corsHeaders(origin) },
-      });
-      response.headers.set(
-        'Set-Cookie',
-        `lb_session=${sessionToken}; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`
-      );
-      response.headers.set(
-        'Set-Cookie',
-        `twitch_oauth_state=; Path=/; Expires=Thu, 01 Jan 1970 00:00:00 GMT`
-      );
-      return response;
-    } catch {
-      return new Response(null, {
-        status: 302,
-        headers: { Location: '/?error=twitch_login_failed', ...corsHeaders(origin) },
-      });
+      return redirectTo(target, [
+        `lb_session=${sessionToken}; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`,
+        clearStateCookie,
+      ]);
+    } catch (err) {
+      console.error('[auth-twitch] callback failed', err);
+      return redirectTo(dashboardTarget(dashboardBase, { error: 'twitch_login_failed' }), [clearStateCookie]);
     }
   }
 
@@ -215,11 +254,14 @@ export async function handler(request) {
     });
   }
 
-  const redirectUri = url.searchParams.get('redirect') ||
+  const dashboardBase = sanitizeDashboard(url.searchParams.get('redirect'), url);
+  const redirectUri =
     Deno.env.get('TWITCH_REDIRECT_URI') ||
     `${url.origin}/functions/v1/auth-twitch`;
 
-  const state = generateToken(16);
+  const nonce = generateToken(16);
+  const state = `${nonce}|${encodeURIComponent(dashboardBase)}`;
+
   const authUrl = new URL(AUTHORIZE_URL);
   authUrl.searchParams.set('client_id', clientId);
   authUrl.searchParams.set('redirect_uri', redirectUri);
@@ -227,13 +269,9 @@ export async function handler(request) {
   authUrl.searchParams.set('scope', 'user:read:email moderator:read:chatters');
   authUrl.searchParams.set('state', state);
 
-  const response = new Response(null, {
-    status: 302,
-    headers: { Location: authUrl.toString(), ...corsHeaders(origin) },
-  });
-  response.headers.set(
-    'Set-Cookie',
-    `twitch_oauth_state=${state}; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=600`
-  );
-  return response;
+  return redirectTo(authUrl, [
+    `${OAUTH_STATE_COOKIE}=${encodeURIComponent(state)}; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=${OAUTH_STATE_MAX_AGE}`,
+  ]);
 }
+
+Deno.serve(handler);

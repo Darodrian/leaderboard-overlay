@@ -67,17 +67,41 @@ function copyText(text) {
   });
 }
 
+const SESSION_STORAGE_KEY = 'lb_session_token';
+const STREAMER_STORAGE_KEY = 'lb_streamer_id';
+const LOGIN_STORAGE_KEY = 'lb_twitch_login';
+
+function readStored(key) {
+  try { return localStorage.getItem(key) || ''; } catch { return ''; }
+}
+
+function storeValue(key, value) {
+  try { localStorage.setItem(key, value); } catch { /* storage blocked */ }
+}
+
+function clearStoredSession() {
+  try {
+    localStorage.removeItem(SESSION_STORAGE_KEY);
+    localStorage.removeItem(STREAMER_STORAGE_KEY);
+    localStorage.removeItem(LOGIN_STORAGE_KEY);
+  } catch { /* storage blocked */ }
+}
+
 async function fetchJSON(path, opts = {}) {
-  const res = await fetch(FUNCTIONS_BASE + path, {
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: SUPABASE_ANON_KEY,
-      ...opts.headers,
-    },
+  const headers = {
+    'Content-Type': 'application/json',
+    apikey: SUPABASE_ANON_KEY,
+    ...(opts.headers || {}),
+  };
+  const session = readStored(SESSION_STORAGE_KEY);
+  if (session) headers.Authorization = 'Bearer ' + session;
+
+  const { headers: _ignored, ...rest } = opts;
+  return fetch(FUNCTIONS_BASE + path, {
+    ...rest,
+    headers,
     credentials: 'include',
-    ...opts,
   });
-  return res;
 }
 
 // ---- Session check ----
@@ -87,6 +111,15 @@ async function checkSession() {
   const broadcasterIdFromUrl = urlParams.get('broadcaster_id');
   const error = urlParams.get('error');
 
+  // The OAuth callback passes the session token in the URL hash so it never
+  // reaches a server or referrer. Persist it, then strip it from the address bar.
+  const hashParams = new URLSearchParams(location.hash.replace(/^#/, ''));
+  const hashSession = hashParams.get('session');
+  if (hashSession) {
+    storeValue(SESSION_STORAGE_KEY, hashSession);
+    window.history.replaceState({}, document.title, location.pathname + location.search);
+  }
+
   if (error) {
     flash('Twitch connection failed: ' + error, 'err');
     window.history.replaceState({}, document.title, location.pathname);
@@ -95,25 +128,43 @@ async function checkSession() {
   if (connected && broadcasterIdFromUrl) {
     broadcasterId = broadcasterIdFromUrl;
     broadcasterLogin = connected;
+    storeValue(STREAMER_STORAGE_KEY, broadcasterId);
+    storeValue(LOGIN_STORAGE_KEY, broadcasterLogin);
     showConnected(true);
     window.history.replaceState({}, document.title, location.pathname);
     await loadSettings();
     return;
   }
 
+  // Restore the last known streamer immediately so a blocked third-party
+  // cookie does not make a connected account look disconnected on reload.
+  const storedId = readStored(STREAMER_STORAGE_KEY);
+  if (storedId) {
+    broadcasterId = storedId;
+    broadcasterLogin = readStored(LOGIN_STORAGE_KEY);
+    showConnected(true);
+    await loadSettings();
+  }
+
   try {
     const res = await fetchJSON('/auth-session');
     if (!res.ok) {
+      clearStoredSession();
+      broadcasterId = '';
+      broadcasterLogin = '';
+      obsToken = '';
       showConnected(false);
       return;
     }
     const data = await res.json();
     broadcasterId = data.streamerId;
     broadcasterLogin = data.twitchLogin;
+    storeValue(STREAMER_STORAGE_KEY, broadcasterId);
+    storeValue(LOGIN_STORAGE_KEY, broadcasterLogin);
     showConnected(true);
     await loadSettings();
   } catch (e) {
-    showConnected(false);
+    if (!storedId) showConnected(false);
   }
 }
 
@@ -131,25 +182,10 @@ async function loadSettings() {
 
 // ---- Connect Twitch ----
 if (BTN_CONNECT) {
-  BTN_CONNECT.addEventListener('click', async () => {
+  BTN_CONNECT.addEventListener('click', () => {
     const redirect = new URL('.', location.href).href;
     const authUrl = `${FUNCTIONS_BASE}/auth-twitch?redirect=${encodeURIComponent(redirect)}`;
-    try {
-      const res = await fetch(authUrl, {
-        method: 'GET',
-        redirect: 'manual',
-        credentials: 'include',
-        headers: { apikey: SUPABASE_ANON_KEY },
-      });
-      const twitchUrl = res.headers.get('location');
-      if (twitchUrl) {
-        location.href = twitchUrl;
-      } else {
-        flash('Twitch login failed', 'err');
-      }
-    } catch (e) {
-      flash('Twitch login failed', 'err');
-    }
+    location.href = authUrl;
   });
 }
 
@@ -159,6 +195,7 @@ if (BTN_DISCONNECT) {
     try {
       await fetchJSON('/auth-logout', { method: 'POST' });
     } catch { /* ignore */ }
+    clearStoredSession();
     broadcasterId = '';
     broadcasterLogin = '';
     obsToken = '';

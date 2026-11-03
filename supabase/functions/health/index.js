@@ -25,3 +25,5 @@ export async function handler(request) {
     { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
   );
 }
+
+Deno.serve(handler);
