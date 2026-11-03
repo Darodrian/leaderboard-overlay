@@ -111,7 +111,12 @@ async function startRoom() {
   if (!obsToken) return;
 
   const next = createBridge('overlay:' + obsToken);
-  next.on('hello', () => next.send('settings.update', { settings }));
+  // Do NOT broadcast settings.update on hello. The preview iframe reloads and
+  // reconnects on every dashboard setting change (updatePreview reloads its src),
+  // which would trigger a broadcast to every client in the room — including the
+  // actual OBS overlay — causing it to refresh before the user hits Save.
+  // Settings are pushed to the overlay only on explicit save (PUT /settings
+  // triggers a server broadcast) and once on initial dashboard load below.
   next.on('status', (status) => {
     if (status === 'CHANNEL_ERROR') console.warn('[dashboard] live channel error');
   });
@@ -456,16 +461,20 @@ function renderBoards() {
     });
   });
   container.querySelectorAll('input[id^="board-label-"]').forEach((el) => {
-    el.addEventListener('input', (e) => {
+    const applyLabel = (e) => {
       const board = e.target.dataset.board;
       const boardLabels = { ...settings.boardLabels };
       const value = (e.target.value || '').trim();
+      console.log(`[dashboard] board-label ${e.type} board="${board}" value="${value}" before boardLabels=${JSON.stringify(settings.boardLabels)}`);
       if (value) boardLabels[board] = value;
       else delete boardLabels[board];
+      console.log(`[dashboard] board-label ${e.type} board="${board}" after boardLabels=${JSON.stringify(boardLabels)}`);
       settings = applySettings(settings, { boardLabels });
       syncUI();
       renderBoards();
-    });
+    };
+    el.addEventListener('input', applyLabel);
+    el.addEventListener('change', applyLabel);
   });
 }
 
@@ -559,6 +568,7 @@ BTN_SAVE.addEventListener('click', async () => {
   BTN_SAVE.textContent = 'Saving…';
   setSaveStatus('Guardando…');
   try {
+    console.log('[dashboard] save payload boardLabels:', JSON.stringify(settings.boardLabels));
     const res = await fetchJSON('/settings', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -571,6 +581,7 @@ BTN_SAVE.addEventListener('click', async () => {
       return;
     }
     const data = await res.json();
+    console.log('[dashboard] save response boardLabels:', JSON.stringify(data.settings?.boardLabels));
     settings = applySettings(DEFAULT_SETTINGS, data.settings);
     syncUI();
     renderBoards();
