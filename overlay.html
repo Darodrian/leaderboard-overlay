@@ -123,7 +123,7 @@ function render() {
       const boardRows = bs ? bs.rows : [];
       return renderBoard(board, boardRows, activeWindow);
     }).join('');
-    const layoutClass = settings.screenLayout === 'side-by-side' ? 'lb-layout-side-by-side' : 'lb-layout-stacked';
+    const layoutClass = 'lb-layout-stacked';
     root.innerHTML = '<div class="' + layoutClass + '">' + boardsHtml + '</div>';
   }
 
@@ -138,8 +138,7 @@ function startRotation() {
     .filter(([, cfg]) => cfg.active)
     .map(([board]) => board);
 
-  // Rotation only makes sense in single-board layout; in stacked all boards show at once.
-  if (s.screenLayout !== 'single' || !s.rotation.enabled || activeBoards.length === 0) {
+  if (!s.rotation.enabled || activeBoards.length === 0) {
     if (rotationTimer !== null) {
       clearInterval(rotationTimer);
       rotationTimer = null;
@@ -177,37 +176,66 @@ function startRotation() {
 
   const intervalMs = s.rotation.intervalMs;
   const mode = s.rotationMode;
+  const isStacked = s.screenLayout !== 'single';
 
   const tick = () => {
-    const windows = s.boards[activeBoard]?.windows || ['this_stream'];
+    if (isStacked) {
+      // In stacked layout every board shows at once; rotate each board's window independently.
+      let changed = false;
+      activeBoards.forEach((board) => {
+        const windows = s.boards[board]?.windows || ['this_stream'];
+        if (windows.length <= 1) return;
+        const wi = boardWindowIdx[board] ?? 0;
+        const nextWi = (wi + 1) % windows.length;
+        boardWindowIdx[board] = nextWi;
+        if (board === activeBoard) activeWindow = windows[nextWi];
+        changed = true;
+      });
+      if (!changed) return;
+    } else {
+      const windows = s.boards[activeBoard]?.windows || ['this_stream'];
 
-    if (mode === 'windows') {
-      const wi = boardWindowIdx[activeBoard] ?? 0;
-      const nextWi = (wi + 1) % windows.length;
-      boardWindowIdx[activeBoard] = nextWi;
-      activeWindow = windows[nextWi];
-    } else if (mode === 'boards') {
-      bi = (bi + 1) % activeBoards.length;
-      activeBoard = activeBoards[bi];
-      const bw = boardWindowIdx[activeBoard] ?? 0;
-      const bwindows = s.boards[activeBoard]?.windows || ['this_stream'];
-      activeWindow = bwindows[bw] || bwindows[0];
-    } else if (mode === 'both') {
-      const wi = boardWindowIdx[activeBoard] ?? 0;
-      if (wi === windows.length - 1) {
+      if (mode === 'windows') {
+        const wi = boardWindowIdx[activeBoard] ?? 0;
+        const nextWi = (wi + 1) % windows.length;
+        boardWindowIdx[activeBoard] = nextWi;
+        activeWindow = windows[nextWi];
+      } else if (mode === 'boards') {
         bi = (bi + 1) % activeBoards.length;
         activeBoard = activeBoards[bi];
+        const bw = boardWindowIdx[activeBoard] ?? 0;
         const bwindows = s.boards[activeBoard]?.windows || ['this_stream'];
-        boardWindowIdx[activeBoard] = 0;
-        activeWindow = bwindows[0];
-      } else {
-        boardWindowIdx[activeBoard] = wi + 1;
-        activeWindow = windows[wi + 1];
+        activeWindow = bwindows[bw] || bwindows[0];
+      } else if (mode === 'both') {
+        const wi = boardWindowIdx[activeBoard] ?? 0;
+        if (wi === windows.length - 1) {
+          bi = (bi + 1) % activeBoards.length;
+          activeBoard = activeBoards[bi];
+          const bwindows = s.boards[activeBoard]?.windows || ['this_stream'];
+          boardWindowIdx[activeBoard] = 0;
+          activeWindow = bwindows[0];
+        } else {
+          boardWindowIdx[activeBoard] = wi + 1;
+          activeWindow = windows[wi + 1];
+        }
       }
     }
 
-    const bs = state.boards[activeBoard];
-    root.innerHTML = '<div class="lb-panel">' + renderBoard(activeBoard, bs ? bs.rows : [], activeWindow) + '</div>';
+    if (isStacked) {
+      // Re-render all active boards with their current windows.
+      const boardsHtml = activeBoards.map((board) => {
+        const bs = state.boards[board];
+        const boardRows = bs ? bs.rows : [];
+        const bw = boardWindowIdx[board] ?? 0;
+        const bwindows = s.boards[board]?.windows || ['this_stream'];
+        const win = bwindows[bw] || bwindows[0];
+        return renderBoard(board, boardRows, win);
+      }).join('');
+      root.innerHTML = '<div class="lb-layout-stacked">' + boardsHtml + '</div>';
+    } else {
+      const bs = state.boards[activeBoard];
+      root.innerHTML = '<div class="lb-panel">' + renderBoard(activeBoard, bs ? bs.rows : [], activeWindow) + '</div>';
+    }
   };
 
   rotationTimer = window.setInterval(tick, intervalMs);

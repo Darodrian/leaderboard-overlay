@@ -70,9 +70,9 @@ function clampNumber(value, min, max) {
 function clampSettings(settings) {
   settings.visuals.opacity = clampNumber(settings.visuals.opacity, 0, 100);
   settings.visuals.fontSize = clampNumber(settings.visuals.fontSize, 8, 72);
-  settings.layout.width = clampNumber(settings.layout.width, 200, 800);
+  settings.layout.width = clampNumber(settings.layout.width, 200, 1600);
   settings.layout.padding = clampNumber(settings.layout.padding, 0, 48);
-  settings.layout.borderRadius = clampNumber(settings.layout.borderRadius, 0, 999);
+  settings.layout.borderRadius = clampNumber(settings.layout.borderRadius, 0, 100);
   settings.rotation.intervalMs = clampNumber(settings.rotation.intervalMs, 3000, 300000);
   settings.tipThresholdCents = clampNumber(settings.tipThresholdCents, 0, Number.MAX_SAFE_INTEGER);
 

@@ -16,6 +16,9 @@ const CONNECTION_STATUS = $('connection-status');
 const MSG = $('msg');
 const SAVE_STATUS = $('save-status');
 const BTN_SAVE = $('btn-save');
+const PREVIEW_IFRAME = $('preview');
+
+let previewUrl = '';
 
 let broadcasterId = '';
 let broadcasterLogin = '';
@@ -42,6 +45,20 @@ function updateCopyButton() {
   if (!BTN_COPY_URL) return;
   BTN_COPY_URL.disabled = !obsToken;
   BTN_COPY_URL.title = obsToken ? '' : 'Overlay URL is still loading';
+}
+
+function updatePreview() {
+  if (!PREVIEW_IFRAME || !obsToken) {
+    PREVIEW_IFRAME.src = 'about:blank';
+    return;
+  }
+  const base = new URL('overlay.html', location.href);
+  base.search = 'token=' + encodeURIComponent(obsToken);
+  // Cache-buster so the preview reloads when settings change.
+  base.search += '&_=' + Date.now();
+  PREVIEW_IFRAME.src = base.href;
+  const note = $('preview-note');
+  if (note) note.hidden = true;
 }
 
 function showConnected(connected) {
@@ -335,6 +352,7 @@ function syncUI() {
   for (const [key, value] of Object.entries(vars)) {
     document.documentElement.style.setProperty(key, value);
   }
+  updatePreview();
 }
 
 let themeColorsPreset = '';
@@ -456,6 +474,7 @@ function renderBoards() {
       if (e.target.value) boardLabels[board] = e.target.value;
       else delete boardLabels[board];
       settings = applySettings(settings, { boardLabels });
+      syncUI();
     });
   });
 }
@@ -477,6 +496,7 @@ $('hidden-accounts').addEventListener('input', (e) => {
   settings = applySettings(settings, {
     hiddenAccounts: e.target.value.split(',').map((a) => a.trim()).filter(Boolean),
   });
+  syncUI();
 });
 
 $('rotation-interval').addEventListener('change', (e) => {
@@ -502,6 +522,7 @@ async function loadServerSettings() {
     const data = await res.json();
     obsToken = data.obsToken || '';
     updateCopyButton();
+    updatePreview();
     if (data.settings) {
       settings = applySettings(DEFAULT_SETTINGS, data.settings);
       syncUI();

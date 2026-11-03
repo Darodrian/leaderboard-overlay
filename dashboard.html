@@ -1,200 +1,212 @@
 <!doctype html>
-<html lang="en">
+<html lang="es-419">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Leaderboard Overlay · Control</title>
+<title>Tablero de Clasificación · Control</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="./css/dashboard.css">
 </head>
 <body>
 <div class="wrap">
-  <div class="msg" id="msg" hidden></div>
+  <div class="col-left">
+    <div class="msg" id="msg" hidden></div>
 
-  <div id="connection-panel" class="panel connection-panel">
-    <div class="connection-copy">
-      <h2 id="connection-title">Connect Twitch</h2>
-      <span id="connection-status" class="connection-status"></span>
+    <div id="connection-panel" class="panel connection-panel">
+      <div class="connection-copy">
+        <h2 id="connection-title">Conectar Twitch</h2>
+        <span id="connection-status" class="connection-status"></span>
+      </div>
+      <div class="connection-actions">
+        <button type="button" id="btn-connect">Conectar cuenta de Twitch</button>
+        <div id="connection-connected" class="connection-connected" hidden>
+          <button type="button" id="btn-copy-url" disabled>Copiar URL del overlay</button>
+          <button type="button" id="btn-disconnect">Desconectar</button>
+        </div>
+      </div>
     </div>
-    <div class="connection-actions">
-      <button type="button" id="btn-connect">Connect Twitch account</button>
-      <div id="connection-connected" class="connection-connected" hidden>
-        <button type="button" id="btn-copy-url" disabled>Copy overlay URL</button>
-        <button type="button" id="btn-disconnect">Disconnect</button>
+
+    <div id="settings-panel" class="panel settings-panel">
+      <div class="settings-head">
+        <div class="settings-head-copy">
+          <h2>Configuración</h2>
+          <div class="save-status" id="save-status"></div>
+        </div>
+        <button type="button" id="btn-save" class="btn btn-indigo">Guardar configuración</button>
+      </div>
+
+      <div class="settings-grid">
+        <div class="section">
+          <h3>Mostrar rangos</h3>
+          <label class="field row">
+            <input type="checkbox" id="display-ranks" checked>
+            <span>Mostrar rangos (top 25)</span>
+          </label>
+          <label class="field row">
+            <input type="checkbox" id="display-medals" checked>
+            <span>Medallas</span>
+          </label>
+          <label class="field row">
+            <input type="checkbox" id="display-rank-numbers" checked>
+            <span>Números de rango</span>
+          </label>
+          <label class="field row">
+            <input type="checkbox" id="display-bars" checked>
+            <span>Barras de progreso</span>
+          </label>
+          <label class="field row">
+            <input type="checkbox" id="display-amounts" checked>
+            <span>Cantidades de puntos</span>
+          </label>
+          <label class="field">
+            <span>Cuentas ocultas (separadas por comas)</span>
+            <input id="hidden-accounts" type="text" placeholder="nightbot, streamelements" class="input">
+          </label>
+        </div>
+
+        <div class="section">
+          <h3>Puntos</h3>
+          <div class="grid-2">
+            <label class="field">
+              <span>Puntos por dólar (propinas)</span>
+              <input id="points-tip" type="number" value="100" class="input">
+            </label>
+            <label class="field">
+              <span>Puntos por bit</span>
+              <input id="points-bit" type="number" value="1" class="input">
+            </label>
+            <label class="field">
+              <span>Puntos por sub</span>
+              <input id="points-sub" type="number" value="500" class="input">
+            </label>
+            <label class="field">
+              <span>Puntos por sub regalada</span>
+              <input id="points-gift" type="number" value="300" class="input">
+            </label>
+            <label class="field">
+              <span>Puntos por asaltante</span>
+              <input id="points-raid" type="number" value="50" class="input">
+            </label>
+            <label class="field">
+              <span>Propina mínima (centavos)</span>
+              <input id="tip-threshold" type="number" value="0" class="input">
+            </label>
+          </div>
+          <label class="field">
+            <span>Nombre anónimo para mostrar</span>
+            <input id="anonymous-mask" type="text" value="Mystery Supporter" class="input">
+          </label>
+        </div>
+
+        <div class="section section--wide">
+          <h3>Modos de tablero</h3>
+          <p class="note">Habilita los tableros que quieras mostrar en el overlay.</p>
+          <div id="boards-list" class="space-y-2"></div>
+        </div>
+
+        <div class="section">
+          <h3>Diseño</h3>
+          <label class="field">
+            <span>Diseño de pantalla</span>
+            <select id="screen-layout" class="input">
+              <option value="single">Tablero único</option>
+              <option value="stacked">Tableros apilados</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Ancho del overlay (px)</span>
+            <input id="layout-width" type="range" min="200" max="1600" value="420" class="slider">
+            <span id="layout-width-val">420 px</span>
+          </label>
+          <label class="field">
+            <span>Relleno del overlay (px)</span>
+            <input id="layout-padding" type="range" min="0" max="48" value="12" class="slider">
+            <span id="layout-padding-val">12 px</span>
+          </label>
+          <label class="field">
+            <span>Radio de esquina (px)</span>
+            <input id="layout-radius" type="range" min="0" max="100" value="16" class="slider">
+            <span id="layout-radius-val">16 px</span>
+          </label>
+        </div>
+
+        <div class="section">
+          <h3>Apariencia</h3>
+          <label class="field">
+            <span>Opacidad (%)</span>
+            <input id="visual-opacity" type="range" min="0" max="100" value="100" class="slider">
+            <span id="visual-opacity-val">100%</span>
+          </label>
+          <label class="field">
+            <span>Tamaño de fuente (px)</span>
+            <input id="visual-font-size" type="range" min="8" max="72" value="18" class="slider">
+            <span id="visual-font-size-val">18 px</span>
+          </label>
+          <label class="field">
+            <span>Familia de fuente</span>
+            <select id="font-family" class="input">
+              <option value="system">Fuente del sistema</option>
+              <option value="Coming Soon">Coming Soon</option>
+              <option value="Z Pix">Z Pix</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Alineación de etiquetas</span>
+            <select id="label-alignment" class="input">
+              <option value="center">Centro</option>
+              <option value="left">Izquierda</option>
+              <option value="right">Derecha</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="section">
+          <h3>Tema</h3>
+          <label class="field">
+            <span>Preajuste de tema</span>
+            <select id="theme-preset" class="input">
+              <option value="midnight">Medianoche</option>
+              <option value="ember">Brasa</option>
+              <option value="mint">Menta</option>
+              <option value="grape">Uva</option>
+              <option value="paper">Papel</option>
+            </select>
+          </label>
+          <div class="grid-2" id="theme-colors"></div>
+          <button type="button" id="theme-reset" class="btn btn-outline" style="margin-top: 8px;">Restablecer colores al predeterminado</button>
+        </div>
+
+        <div class="section">
+          <h3>Rotación</h3>
+          <label class="field row">
+            <input type="checkbox" id="rotation-enabled">
+            <span>Habilitar rotación</span>
+          </label>
+          <label class="field">
+            <span>Modo de rotación</span>
+            <select id="rotation-mode" class="input">
+              <option value="boards">Rotar tableros</option>
+              <option value="windows">Rotar ventanas de tiempo</option>
+              <option value="both">Rotar tableros y ventanas</option>
+            </select>
+          </label>
+          <label class="field">
+            <span>Intervalo de rotación (segundos)</span>
+            <input id="rotation-interval" type="number" min="3" max="300" value="30" class="input">
+          </label>
+          <p class="note">Recorre los tableros activos y/o ventanas de tiempo.</p>
+        </div>
       </div>
     </div>
   </div>
 
-  <div id="settings-panel" class="panel settings-panel">
-    <div class="settings-head">
-      <div class="settings-head-copy">
-        <h2>Settings</h2>
-        <div class="save-status" id="save-status"></div>
+  <div class="col-right">
+    <div class="panel panel-preview">
+      <h2>Vista previa</h2>
+      <div id="preview-shell">
+        <iframe id="preview" title="Vista previa del overlay" src="about:blank"></iframe>
       </div>
-      <button type="button" id="btn-save" class="btn btn-indigo">Save settings</button>
-    </div>
-
-    <div class="settings-grid">
-      <div class="section">
-        <h3>Rank display</h3>
-        <label class="field row">
-          <input type="checkbox" id="display-ranks" checked>
-          <span>Show ranks (top 25)</span>
-        </label>
-        <label class="field row">
-          <input type="checkbox" id="display-medals" checked>
-          <span>Medals</span>
-        </label>
-        <label class="field row">
-          <input type="checkbox" id="display-rank-numbers" checked>
-          <span>Rank numbers</span>
-        </label>
-        <label class="field row">
-          <input type="checkbox" id="display-bars" checked>
-          <span>Progress bars</span>
-        </label>
-        <label class="field row">
-          <input type="checkbox" id="display-amounts" checked>
-          <span>Point amounts</span>
-        </label>
-        <label class="field">
-          <span>Hidden accounts (comma separated)</span>
-          <input id="hidden-accounts" type="text" placeholder="nightbot, streamelements" class="input">
-        </label>
-      </div>
-
-      <div class="section">
-        <h3>Points</h3>
-        <div class="grid-2">
-          <label class="field">
-            <span>Points per dollar (tips)</span>
-            <input id="points-tip" type="number" value="100" class="input">
-          </label>
-          <label class="field">
-            <span>Points per bit</span>
-            <input id="points-bit" type="number" value="1" class="input">
-          </label>
-          <label class="field">
-            <span>Points per sub</span>
-            <input id="points-sub" type="number" value="500" class="input">
-          </label>
-          <label class="field">
-            <span>Points per gifted sub</span>
-            <input id="points-gift" type="number" value="300" class="input">
-          </label>
-          <label class="field">
-            <span>Points per raider</span>
-            <input id="points-raid" type="number" value="50" class="input">
-          </label>
-          <label class="field">
-            <span>Minimum tip (cents)</span>
-            <input id="tip-threshold" type="number" value="0" class="input">
-          </label>
-        </div>
-        <label class="field">
-          <span>Anonymous display name</span>
-          <input id="anonymous-mask" type="text" value="Mystery Supporter" class="input">
-        </label>
-      </div>
-
-      <div class="section section--wide">
-        <h3>Board modes</h3>
-        <p class="note">Enable the boards you want to show on the overlay.</p>
-        <div id="boards-list" class="space-y-2"></div>
-      </div>
-
-      <div class="section">
-        <h3>Layout</h3>
-        <label class="field">
-          <span>Screen layout</span>
-          <select id="screen-layout" class="input">
-            <option value="single">Single board</option>
-            <option value="stacked">Stacked boards</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Overlay width (px)</span>
-          <input id="layout-width" type="range" min="200" max="1200" value="420" class="slider">
-          <span id="layout-width-val">420 px</span>
-        </label>
-        <label class="field">
-          <span>Overlay padding (px)</span>
-          <input id="layout-padding" type="range" min="0" max="48" value="12" class="slider">
-          <span id="layout-padding-val">12 px</span>
-        </label>
-        <label class="field">
-          <span>Corner radius (px)</span>
-          <input id="layout-radius" type="range" min="0" max="999" value="16" class="slider">
-          <span id="layout-radius-val">16 px</span>
-        </label>
-      </div>
-
-      <div class="section">
-        <h3>Visuals</h3>
-        <label class="field">
-          <span>Opacity (%)</span>
-          <input id="visual-opacity" type="range" min="0" max="100" value="100" class="slider">
-          <span id="visual-opacity-val">100%</span>
-        </label>
-        <label class="field">
-          <span>Font size (px)</span>
-          <input id="visual-font-size" type="range" min="8" max="72" value="18" class="slider">
-          <span id="visual-font-size-val">18 px</span>
-        </label>
-        <label class="field">
-          <span>Font family</span>
-          <select id="font-family" class="input">
-            <option value="system">System font</option>
-            <option value="Coming Soon">Coming Soon</option>
-            <option value="Z Pix">Z Pix</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Label alignment</span>
-          <select id="label-alignment" class="input">
-            <option value="center">Center</option>
-            <option value="left">Left</option>
-            <option value="right">Right</option>
-          </select>
-        </label>
-      </div>
-
-      <div class="section">
-        <h3>Theme</h3>
-        <label class="field">
-          <span>Theme preset</span>
-          <select id="theme-preset" class="input">
-            <option value="midnight">Midnight</option>
-            <option value="ember">Ember</option>
-            <option value="mint">Mint</option>
-            <option value="grape">Grape</option>
-            <option value="paper">Paper</option>
-          </select>
-        </label>
-        <div class="grid-2" id="theme-colors"></div>
-        <button type="button" id="theme-reset" class="btn btn-outline" style="margin-top: 8px;">Reset colors to preset defaults</button>
-      </div>
-
-      <div class="section">
-        <h3>Rotation</h3>
-        <label class="field row">
-          <input type="checkbox" id="rotation-enabled">
-          <span>Enable rotation</span>
-        </label>
-        <label class="field">
-          <span>Rotation mode</span>
-          <select id="rotation-mode" class="input">
-            <option value="boards">Rotate boards</option>
-            <option value="windows">Rotate time windows</option>
-            <option value="both">Rotate boards & windows</option>
-          </select>
-        </label>
-        <label class="field">
-          <span>Rotation interval (seconds)</span>
-          <input id="rotation-interval" type="number" min="3" max="300" value="30" class="input">
-        </label>
-        <p class="note">Cycles through active boards and/or time windows.</p>
-      </div>
+      <p class="note" id="preview-note">Conecta tu cuenta de Twitch para ver el overlay que se usará en OBS.</p>
     </div>
   </div>
 </div>
