@@ -221,7 +221,7 @@ export const BOARD_UNITS = {
   bits: { singular: 'bit', plural: 'bits', symbol: 'bit' },
   subs: { singular: 'sub', plural: 'subs', symbol: 'sub' },
   raiders: { singular: 'viewer', plural: 'viewers', symbol: 'raid' },
-  chat_messages: { singular: 'message', plural: 'messages', symbol: '💬' },
+  chat_messages: { singular: 'mensaje', plural: 'mensajes', symbol: '💬' },
   clips: { singular: 'clip', plural: 'clips', symbol: '🎥' },
 };
 

@@ -249,7 +249,9 @@ function startRotation() {
 
 function startComfyJS() {
   if (!state) return;
-  const channel = '#' + (state.settings.twitchLogin || '');
+  const login = String(state.settings?.twitchLogin || '');
+  if (!login) return;
+  const channel = '#' + login;
   initComfyJS(channel, {
     onMessage: async (msg) => {
       try {
@@ -345,6 +347,7 @@ async function main() {
 // This only affects the preview iframe (the dashboard postMessages to this
 // iframe's contentWindow), not the separate OBS overlay instance.
 window.addEventListener('message', (e) => {
+  if (!state) return;
   if (e.data && e.data.type === 'settings.update' && e.data.settings) {
     state.settings = mergeSettings(e.data.settings);
     render();

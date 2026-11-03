@@ -212,7 +212,7 @@ input[type="color"].color-input { width: 60px; height: 30px; border: 1px solid v
 }
 
 .preview-wrap {
-  position: relative; width: 260px; height: 160px; border-radius: 12px;
+  position: relative; width: 100%; max-width: 560px; height: 340px; border-radius: 12px;
   overflow: hidden; border: 1px solid var(--line); background: #000;
   margin-bottom: 8px;
 }
@@ -225,5 +225,5 @@ input[type="color"].color-input { width: 60px; height: 30px; border: 1px solid v
 .panel-preview h2 { margin: 0 0 2px; }
 
 @media (max-width: 700px) {
-  .preview-wrap { height: 220px; }
+  .preview-wrap { height: 300px; }
 }
