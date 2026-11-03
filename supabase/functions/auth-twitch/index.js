@@ -118,10 +118,15 @@ function resolveRedirectUri(requestUrl) {
   if (configured) {
     try {
       const parsed = new URL(configured);
-      if (parsed.pathname.includes('/functions/v1/')) return configured;
-    } catch { /* malformed, fall back */ }
+      if (parsed.pathname.includes('/functions/v1/')) {
+        parsed.protocol = 'https:';
+        return parsed.toString();
+      }
+    } catch { /* malformed, fall through */ }
   }
-  return `${requestUrl.origin}/functions/v1/auth-twitch`;
+  const url = new URL(requestUrl);
+  url.protocol = 'https:';
+  return `${url.origin}/functions/v1/auth-twitch`;
 }
 
 function redirectTo(location, cookies = []) {
