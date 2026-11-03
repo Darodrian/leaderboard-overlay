@@ -376,6 +376,7 @@ function syncUI() {
   for (const [key, value] of Object.entries(vars)) {
     document.documentElement.style.setProperty(key, value);
   }
+  updatePreview();
 }
 
 let themeColorsPreset = '';
@@ -462,6 +463,7 @@ function renderBoards() {
       else delete boardLabels[board];
       settings = applySettings(settings, { boardLabels });
       syncUI();
+      renderBoards();
     });
   });
 }
