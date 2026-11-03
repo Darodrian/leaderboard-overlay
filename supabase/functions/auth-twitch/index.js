@@ -113,6 +113,17 @@ function dashboardTarget(base, params = {}) {
   return target;
 }
 
+function resolveRedirectUri(requestUrl) {
+  const configured = Deno.env.get('TWITCH_REDIRECT_URI');
+  if (configured) {
+    try {
+      const parsed = new URL(configured);
+      if (parsed.pathname.includes('/functions/v1/')) return configured;
+    } catch { /* malformed, fall back */ }
+  }
+  return `${requestUrl.origin}/functions/v1/auth-twitch`;
+}
+
 function redirectTo(location, cookies = []) {
   const headers = new Headers({ Location: location.toString() });
   for (const cookie of cookies) headers.append('Set-Cookie', cookie);
@@ -155,9 +166,7 @@ export async function handler(request) {
       return redirectTo(dashboardTarget(dashboardBase, { error: 'twitch_not_configured' }), [clearStateCookie]);
     }
 
-    const redirectUri =
-      Deno.env.get('TWITCH_REDIRECT_URI') ??
-      `${url.origin}/functions/v1/auth-twitch`;
+    const redirectUri = resolveRedirectUri(url);
 
     try {
       const tokenRes = await fetch(TOKEN_URL, {
@@ -255,9 +264,7 @@ export async function handler(request) {
   }
 
   const dashboardBase = sanitizeDashboard(url.searchParams.get('redirect'), url);
-  const redirectUri =
-    Deno.env.get('TWITCH_REDIRECT_URI') ||
-    `${url.origin}/functions/v1/auth-twitch`;
+  const redirectUri = resolveRedirectUri(url);
 
   const nonce = generateToken(16);
   const state = `${nonce}|${encodeURIComponent(dashboardBase)}`;
