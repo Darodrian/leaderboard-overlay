@@ -99,6 +99,7 @@ async function fetchJSON(path, opts = {}) {
       apikey: SUPABASE_ANON_KEY,
       ...opts.headers,
     },
+    credentials: 'include',
     ...opts,
   });
   return res;
@@ -147,24 +148,10 @@ async function loadStreamer() {
 
 // ---- Connect Twitch ----
 if (BTN_CONNECT) {
-  BTN_CONNECT.addEventListener('click', async () => {
+  BTN_CONNECT.addEventListener('click', () => {
     const redirect = new URL('.', location.href).href;
     const authUrl = `${FUNCTIONS_BASE}/auth-twitch?redirect=${encodeURIComponent(redirect)}`;
-    try {
-      const res = await fetch(authUrl, {
-        method: 'GET',
-        redirect: 'manual',
-        headers: { apikey: SUPABASE_ANON_KEY },
-      });
-      const redirectUrl = res.headers.get('location');
-      if (redirectUrl) {
-        window.location.href = redirectUrl;
-      } else {
-        flash('Twitch login failed', 'err');
-      }
-    } catch (e) {
-      flash('Twitch login failed', 'err');
-    }
+    location.href = authUrl;
   });
 }
 
