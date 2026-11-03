@@ -1,7 +1,7 @@
 import { FUNCTIONS_BASE, APP_URL, SUPABASE_ANON_KEY } from './config.js';
 import {
   applySettings, cssVars, DEFAULT_SETTINGS, THEMES, ALL_BOARD_TYPES, BOARD_LABELS, BOARD_UNITS, formatBoardQuantity,
-} from './js/settings.js';
+} from './settings.js';
 
 const $ = (id) => document.getElementById(id);
 
