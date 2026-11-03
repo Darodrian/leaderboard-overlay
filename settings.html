@@ -209,7 +209,7 @@
 
 <script type="module">
 import { applySettings, cssVars, DEFAULT_SETTINGS, THEMES, ALL_BOARD_TYPES, BOARD_LABELS, BOARD_UNITS, formatBoardQuantity, nextRotationWindow } from './js/settings.js';
-import { FUNCTIONS_BASE } from './js/overlayData.js';
+import { FUNCTIONS_BASE, SUPABASE_ANON_KEY } from './js/overlayData.js';
 
 const $ = (id) => document.getElementById(id);
 const MSG = $('msg');
@@ -474,7 +474,7 @@ $('rotation-interval').addEventListener('change', (e) => {
 async function loadSettings() {
   try {
     const res = await fetch(FUNCTIONS_BASE + '/settings', {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
       credentials: 'include',
     });
     if (!res.ok) {

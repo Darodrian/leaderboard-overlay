@@ -1,4 +1,4 @@
-import { FUNCTIONS_BASE, APP_URL } from './config.js';
+import { FUNCTIONS_BASE, APP_URL, SUPABASE_ANON_KEY } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -94,7 +94,11 @@ function copyText(text) {
 
 async function fetchJSON(path, opts = {}) {
   const res = await fetch(FUNCTIONS_BASE + path, {
-    headers: { 'Content-Type': 'application/json', ...opts.headers },
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: SUPABASE_ANON_KEY,
+      ...opts.headers,
+    },
     ...opts,
   });
   return res;
@@ -143,10 +147,24 @@ async function loadStreamer() {
 
 // ---- Connect Twitch ----
 if (BTN_CONNECT) {
-  BTN_CONNECT.addEventListener('click', () => {
+  BTN_CONNECT.addEventListener('click', async () => {
     const redirect = new URL('.', location.href).href;
     const authUrl = `${FUNCTIONS_BASE}/auth-twitch?redirect=${encodeURIComponent(redirect)}`;
-    location.href = authUrl;
+    try {
+      const res = await fetch(authUrl, {
+        method: 'GET',
+        redirect: 'manual',
+        headers: { apikey: SUPABASE_ANON_KEY },
+      });
+      const redirectUrl = res.headers.get('location');
+      if (redirectUrl) {
+        window.location.href = redirectUrl;
+      } else {
+        flash('Twitch login failed', 'err');
+      }
+    } catch (e) {
+      flash('Twitch login failed', 'err');
+    }
   });
 }
 

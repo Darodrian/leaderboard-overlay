@@ -1,5 +1,5 @@
-import { FUNCTIONS_BASE } from './config.js';
-export { FUNCTIONS_BASE };
+import { FUNCTIONS_BASE, SUPABASE_ANON_KEY } from './config.js';
+export { FUNCTIONS_BASE, SUPABASE_ANON_KEY };
 
 export const WINDOW_TYPES = [
   'this_stream', '7d', '30d', 'alltime',

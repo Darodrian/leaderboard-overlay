@@ -18,7 +18,7 @@
 <div id="overlay-root"></div>
 
 <script type="module">
-import { loadOverlayState, FUNCTIONS_BASE } from './js/overlayData.js';
+import { loadOverlayState, FUNCTIONS_BASE, SUPABASE_ANON_KEY } from './js/overlayData.js';
 import { initComfyJS, disconnectComfyJS } from './js/comfyjs.js';
 import { cssVars, BOARD_LABELS, formatBoardQuantity, ALL_BOARD_TYPES } from './js/settings.js';
 
@@ -181,7 +181,7 @@ function startComfyJS() {
       try {
         await fetch(FUNCTIONS_BASE + '/webhooks-chat/' + token, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
           body: JSON.stringify({
             userId: msg.userId,
             username: msg.username,
