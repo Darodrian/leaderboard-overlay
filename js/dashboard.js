@@ -47,16 +47,52 @@ function updateCopyButton() {
   BTN_COPY_URL.title = obsToken ? '' : 'La URL del overlay todavía se está cargando';
 }
 
+let previewToken = '';
+let previewDebounce = null;
+
 function updatePreview() {
   if (!PREVIEW_IFRAME || !obsToken) {
     PREVIEW_IFRAME.src = 'about:blank';
+    previewToken = '';
     return;
   }
-  const base = new URL('overlay.html', location.href);
-  base.search = 'token=' + encodeURIComponent(obsToken);
-  // Cache-buster so the preview reloads when settings change.
-  base.search += '&_=' + Date.now();
-  PREVIEW_IFRAME.src = base.href;
+
+  // Only reload the iframe src when the token changes (initial load / reconnect).
+  // On every settings change, just postMessage the live settings to the
+  // already-loaded preview iframe — no reload, no focus loss.
+  if (previewToken !== obsToken) {
+    previewToken = obsToken;
+    const base = new URL('overlay.html', location.href);
+    base.search = 'token=' + encodeURIComponent(obsToken);
+    base.search += '&_=' + Date.now();
+
+    PREVIEW_IFRAME.onload = () => {
+      PREVIEW_IFRAME.onload = null;
+      try {
+        PREVIEW_IFRAME.contentWindow.postMessage(
+          { type: 'settings.update', settings },
+          location.origin
+        );
+      } catch (e) {
+        console.warn('[dashboard] preview postMessage failed', e);
+      }
+    };
+
+    PREVIEW_IFRAME.src = base.href;
+  } else {
+    // Iframe already loaded — push live settings via postMessage (debounced).
+    clearTimeout(previewDebounce);
+    previewDebounce = setTimeout(() => {
+      try {
+        PREVIEW_IFRAME.contentWindow.postMessage(
+          { type: 'settings.update', settings },
+          location.origin
+        );
+      } catch (e) {
+        console.warn('[dashboard] preview postMessage failed', e);
+      }
+    }, 150);
+  }
 
   // Scale the iframe down to fit inside the fixed-size preview container.
   const wrap = PREVIEW_IFRAME.parentElement;
@@ -471,7 +507,6 @@ function renderBoards() {
       console.log(`[dashboard] board-label ${e.type} board="${board}" after boardLabels=${JSON.stringify(boardLabels)}`);
       settings = applySettings(settings, { boardLabels });
       syncUI();
-      renderBoards();
     };
     el.addEventListener('input', applyLabel);
     el.addEventListener('change', applyLabel);

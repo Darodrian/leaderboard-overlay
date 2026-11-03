@@ -341,6 +341,16 @@ async function main() {
   }
 }
 
+// Receive live settings updates from the dashboard preview via postMessage.
+// This only affects the preview iframe (the dashboard postMessages to this
+// iframe's contentWindow), not the separate OBS overlay instance.
+window.addEventListener('message', (e) => {
+  if (e.data && e.data.type === 'settings.update' && e.data.settings) {
+    state.settings = mergeSettings(e.data.settings);
+    render();
+  }
+});
+
 main();
 </script>
 </body>
