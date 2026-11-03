@@ -25,7 +25,6 @@ test('settingsToRow round-trips through mapStreamerRow', () => {
     id: 's1',
     twitch_user_id: 'tw1',
     twitch_login: 'login',
-    license_key: null,
     obs_token: 'tok',
     created_at: '2026-01-01T00:00:00.000Z',
     ...settingsToRow(settings),

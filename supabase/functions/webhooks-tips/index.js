@@ -46,17 +46,6 @@ export async function handler(request) {
     return new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
-  if (!streamer.license_key) {
-    return new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
-  }
-  const { data: license } = await supabase
-    .from('licenses')
-    .select('is_active, expires_at')
-    .eq('key', streamer.license_key)
-    .maybeSingle();
-  if (!license || !license.is_active) return new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
-  if (license.expires_at && new Date(license.expires_at).getTime() <= Date.now()) return new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
-
   const body = await request.json().catch(() => null);
   const eventId = typeof body?.eventId === 'string' ? body.eventId.trim() : '';
   const userId = typeof body?.userId === 'string' ? body.userId.trim() : '';

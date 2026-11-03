@@ -6,7 +6,6 @@ const streamer = {
   id: 's1',
   twitchUserId: 'owner',
   twitchLogin: 'owner_login',
-  licenseKey: 'LIC-1',
   obsToken: 'tok',
   anonymousMaskName: 'Mystery Supporter',
   tipThresholdCents: 100,

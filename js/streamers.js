@@ -3,7 +3,6 @@ export function mapStreamerRow(row) {
     id: row.id,
     twitchUserId: row.twitch_user_id,
     twitchLogin: row.twitch_login,
-    licenseKey: row.license_key,
     obsToken: row.obs_token,
     anonymousMaskName: row.anonymous_mask_name,
     tipThresholdCents: row.tip_threshold_cents,

@@ -168,7 +168,7 @@ export async function handler(request) {
     };
 
     return new Response(
-      JSON.stringify({ settings, twitchLogin: streamer.twitch_login, obsToken: streamer.obs_token, licenseKey: streamer.license_key }),
+      JSON.stringify({ settings, twitchLogin: streamer.twitch_login, obsToken: streamer.obs_token }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
     );
   }

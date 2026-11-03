@@ -11,11 +11,6 @@ const CONNECTION_PANEL = $('connection-panel');
 const CONNECTION_CONNECTED = $('connection-connected');
 const CONNECTION_TITLE = $('connection-title');
 const CONNECTION_STATUS = $('connection-status');
-const LICENSE_SECTION = $('license-section');
-const LICENSE_STATUS = $('license-status');
-const LICENSE_FORM = $('license-form');
-const LICENSE_KEY_IN = $('license-key');
-const BTN_BIND = $('btn-bind-license');
 const OBS_SECTION = $('obs-section');
 const OVERLAY_URL = $('overlay-url');
 const BTN_COPY_URL_OBS = $('btn-copy-url-obs');
@@ -117,7 +112,6 @@ async function checkSession() {
     broadcasterId = data.streamerId;
     broadcasterLogin = data.twitchLogin;
     showConnected(true);
-    if (LICENSE_SECTION) LICENSE_SECTION.hidden = false;
     await loadStreamer();
   } catch (e) {
     showConnected(false);
@@ -134,13 +128,6 @@ async function loadStreamer() {
     if (OVERLAY_URL) OVERLAY_URL.textContent = buildOverlayUrl(obsToken);
     if (OBS_SECTION) OBS_SECTION.hidden = false;
     updatePreview();
-
-    if (LICENSE_STATUS) {
-      LICENSE_STATUS.textContent = data.licenseKey
-        ? 'Licensed — key bound to your Twitch account.'
-        : 'No license bound yet.';
-    }
-    if (LICENSE_FORM) LICENSE_FORM.hidden = data.licenseKey !== null;
   } catch (e) {
     console.warn('[dashboard] load streamer failed', e);
   }
@@ -148,10 +135,24 @@ async function loadStreamer() {
 
 // ---- Connect Twitch ----
 if (BTN_CONNECT) {
-  BTN_CONNECT.addEventListener('click', () => {
-    const redirect = new URL('.', location.href).href;
-    const authUrl = `${FUNCTIONS_BASE}/auth-twitch?redirect=${encodeURIComponent(redirect)}`;
-    location.href = authUrl;
+  BTN_CONNECT.addEventListener('click', async () => {
+    const callbackUrl = new URL('auth-callback.html', location.href).href;
+    const authUrl = `${FUNCTIONS_BASE}/auth-twitch?redirect=${encodeURIComponent(callbackUrl)}`;
+    try {
+      const res = await fetch(authUrl, {
+        method: 'GET',
+        redirect: 'manual',
+        headers: { apikey: SUPABASE_ANON_KEY },
+      });
+      const data = await res.json();
+      if (!res.ok || data.error) {
+        flash('Twitch login failed', 'err');
+        return;
+      }
+      location.href = data.twitchUrl;
+    } catch (e) {
+      flash('Twitch login failed', 'err');
+    }
   });
 }
 
@@ -166,7 +167,6 @@ if (BTN_LOGOUT) {
     obsToken = '';
     showConnected(false);
     BTN_CONNECT.hidden = false;
-    if (LICENSE_SECTION) LICENSE_SECTION.hidden = true;
     if (OBS_SECTION) OBS_SECTION.hidden = true;
     if (SETTINGS_SECTION) SETTINGS_SECTION.hidden = true;
     updatePreview();
@@ -186,26 +186,6 @@ if (BTN_COPY_URL_OBS) {
   BTN_COPY_URL_OBS.addEventListener('click', async () => {
     if (!obsToken) return;
     await copyText(buildOverlayUrl(obsToken));
-  });
-}
-
-// ---- Bind license ----
-if (BTN_BIND) {
-  BTN_BIND.addEventListener('click', async () => {
-    const key = LICENSE_KEY_IN.value.trim();
-    if (!key) { flash('Enter a license key'); return; }
-    try {
-      const res = await fetchJSON('/license-validate', {
-        method: 'POST',
-        body: JSON.stringify({ licenseKey: key }),
-      });
-      const data = await res.json();
-      if (!res.ok) { flash(data.error || 'Invalid license', 'err'); return; }
-      flash('License bound');
-      await loadStreamer();
-    } catch (e) {
-      flash('Could not validate this key', 'err');
-    }
   });
 }
 
