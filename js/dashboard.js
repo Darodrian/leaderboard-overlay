@@ -459,7 +459,8 @@ function renderBoards() {
     el.addEventListener('input', (e) => {
       const board = e.target.dataset.board;
       const boardLabels = { ...settings.boardLabels };
-      if (e.target.value) boardLabels[board] = e.target.value;
+      const value = (e.target.value || '').trim();
+      if (value) boardLabels[board] = value;
       else delete boardLabels[board];
       settings = applySettings(settings, { boardLabels });
       syncUI();

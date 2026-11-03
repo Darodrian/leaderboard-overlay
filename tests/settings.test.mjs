@@ -61,6 +61,24 @@ test('applySettings normalizes hidden accounts to a trimmed string array', () =>
   );
 });
 
+test('applySettings clears a board label when set to an empty object', () => {
+  const current = applySettings(DEFAULT_SETTINGS, { boardLabels: { points: 'Custom' } });
+  assert.strictEqual(current.boardLabels.points, 'Custom');
+  const next = applySettings(current, { boardLabels: {} });
+  assert.deepStrictEqual(next.boardLabels, {});
+});
+
+test('applySettings keeps a cleared board label empty through a save round-trip', () => {
+  // DB still holds the old label; client sends the cleared (empty) boardLabels.
+  const current = applySettings(DEFAULT_SETTINGS, { boardLabels: { points: 'Custom' } });
+  const candidate = applySettings(current, { boardLabels: {} });
+  const next = applySettings(current, candidate);
+  assert.deepStrictEqual(next.boardLabels, {});
+  // Client reloads from the server response.
+  const reloaded = applySettings(DEFAULT_SETTINGS, next);
+  assert.deepStrictEqual(reloaded.boardLabels, {});
+});
+
 test('applySettings drops theme overrides that are not CSS custom properties', () => {
   const overrides = JSON.parse('{"--lb-bg":"#123456","color":"red","__proto__":{"polluted":true}}');
   const settings = applySettings(DEFAULT_SETTINGS, { theme: { overrides } });
