@@ -1,8 +1,25 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const SUPABASE_URL = Deno.env.get('BASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY');
 const TWITCH_WEBHOOK_SECRET = Deno.env.get('TWITCH_WEBHOOK_SECRET');
+
+const ALLOWED_ORIGINS = (Deno.env.get('CORS_ORIGINS') || '*').split(',').map(s => s.trim())
+
+function corsOrigin(origin) {
+  if (ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin)) return origin || '*'
+  return ALLOWED_ORIGINS[0] || '*'
+}
+
+function corsHeaders(origin) {
+  const o = corsOrigin(origin)
+  return {
+    'Access-Control-Allow-Origin': o,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-chat-bot-secret',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  }
+}
 
 const MAX_SKEW_MS = 5 * 60 * 1000;
 
@@ -79,30 +96,35 @@ function shouldCredit(eventType, amountCents, thresholdCents) {
 }
 
 export async function handler(request) {
+  const origin = request.headers.get('origin') || '*'
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders(origin) })
+  }
+
   const rawBody = await request.text();
   const headers = request.headers;
   const messageType = headers.get('twitch-eventsub-message-type') || headers.get('Twitch-Eventsub-Message-Type');
 
   if (!TWITCH_WEBHOOK_SECRET) {
-    return new Response('webhook secret not configured', { status: 500 });
+    return new Response('webhook secret not configured', { status: 500, headers: corsHeaders(origin) });
   }
 
   if (!(await verifySignature(headers, rawBody, TWITCH_WEBHOOK_SECRET))) {
-    return new Response('invalid signature', { status: 403 });
+    return new Response('invalid signature', { status: 403, headers: corsHeaders(origin) });
   }
 
   if (messageType === 'webhook_callback_verification') {
     let body;
-    try { body = JSON.parse(rawBody); } catch { return new Response('bad request', { status: 400 }); }
-    return new Response(body.challenge ?? '', { status: 200 });
+    try { body = JSON.parse(rawBody); } catch { return new Response('bad request', { status: 400, headers: corsHeaders(origin) }); }
+    return new Response(body.challenge ?? '', { status: 200, headers: corsHeaders(origin) });
   }
 
   if (messageType === 'revocation') {
-    return new Response(null, { status: 204 });
+    return new Response(null, { status: 204, headers: corsHeaders(origin) });
   }
 
   let body;
-  try { body = JSON.parse(rawBody); } catch { return new Response('bad payload', { status: 400 }); }
+  try { body = JSON.parse(rawBody); } catch { return new Response('bad payload', { status: 400, headers: corsHeaders(origin) }); }
 
   const subscriptionType = body.subscription?.type;
   const broadcasterUserId = body.subscription?.condition?.broadcaster_user_id;
@@ -110,21 +132,20 @@ export async function handler(request) {
   const messageId = headers.get('twitch-eventsub-message-id') || headers.get('Twitch-Eventsub-Message-Id');
 
   if (!subscriptionType || !broadcasterUserId || !event || !messageId) {
-    return new Response('bad payload', { status: 400 });
+    return new Response('bad payload', { status: 400, headers: corsHeaders(origin) });
   }
 
-  // Clip events
   if (subscriptionType === 'channel.clip.created') {
     const userId = toText(event.user_id);
     const username = displayName(event);
     const clipId = toText(event.id);
-    if (!userId || !username || !clipId) return new Response('bad clip payload', { status: 400 });
+    if (!userId || !username || !clipId) return new Response('bad clip payload', { status: 400, headers: corsHeaders(origin) });
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
     const streamer = await supabase.from('streamers').select('*').eq('twitch_user_id', broadcasterUserId).maybeSingle();
-    if (!streamer.data) return new Response(JSON.stringify({ error: 'streamer not found' }), { status: 404 });
+    if (!streamer.data) return new Response(JSON.stringify({ error: 'streamer not found' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
 
     await supabase.from('clip_events').insert({
       streamer_id: streamer.data.id,
@@ -132,10 +153,9 @@ export async function handler(request) {
       username,
       clip_id: clipId,
     });
-    return new Response(JSON.stringify({ result: 'processed' }), { headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ result: 'processed' }), { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
-  // Point events
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -147,18 +167,18 @@ export async function handler(request) {
     .maybeSingle();
 
   if (!streamer) {
-    return new Response(JSON.stringify({ error: 'unknown-streamer' }), { status: 404 });
+    return new Response(JSON.stringify({ error: 'unknown-streamer' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   const parsed = parseEvent(subscriptionType, event);
-  if (parsed.kind === 'ignore') return new Response(JSON.stringify({ result: 'ignored' }), { headers: { 'Content-Type': 'application/json' } });
+  if (parsed.kind === 'ignore') return new Response(JSON.stringify({ result: 'ignored' }), { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
 
   if (!shouldCredit(parsed.eventType, parsed.amount, streamer.tip_threshold_cents)) {
-    return new Response(JSON.stringify({ result: 'ignored' }), { headers: { 'Content-Type': 'application/json' } });
+    return new Response(JSON.stringify({ result: 'ignored' }), { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   const points = computePoints(parsed.eventType, parsed.amount, streamer.point_config);
-  if (points === 0) return new Response(JSON.stringify({ result: 'ignored' }), { headers: { 'Content-Type': 'application/json' } });
+  if (points === 0) return new Response(JSON.stringify({ result: 'ignored' }), { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
 
   const creditedUsername = parsed.isAnonymous
     ? (streamer.anonymous_mask_name?.trim() || 'Anonymous')
@@ -179,14 +199,13 @@ export async function handler(request) {
   if (insertError) {
     if (insertError.code === '23505') {
       await supabase.rpc('flush_streamer_aggregates', { p_streamer_id: streamer.id });
-      return new Response(JSON.stringify({ result: 'duplicate' }), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ result: 'duplicate' }), { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
     }
-    return new Response(JSON.stringify({ error: insertError.message }), { status: 500 });
+    return new Response(JSON.stringify({ error: insertError.message }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   await supabase.rpc('flush_streamer_aggregates', { p_streamer_id: streamer.id });
 
-  // Broadcast
   try {
     await fetch(`${SUPABASE_URL}/realtime/v1/api/broadcast`, {
       method: 'POST',
@@ -205,5 +224,5 @@ export async function handler(request) {
     });
   } catch { /* non-fatal */ }
 
-  return new Response(JSON.stringify({ result: 'processed' }), { headers: { 'Content-Type': 'application/json' } });
+  return new Response(JSON.stringify({ result: 'processed' }), { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
 }

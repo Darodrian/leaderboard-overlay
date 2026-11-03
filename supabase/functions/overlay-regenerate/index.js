@@ -1,9 +1,26 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const SUPABASE_URL = Deno.env.get('BASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY');
 const TOKEN_ENCRYPTION_KEY = Deno.env.get('TOKEN_ENCRYPTION_KEY');
-const NEXT_PUBLIC_APP_URL = Deno.env.get('NEXT_PUBLIC_APP_URL') || 'http://localhost:3000';
+const NEXT_PUBLIC_APP_URL = Deno.env.get('APP_URL') || 'http://localhost:3000';
+
+const ALLOWED_ORIGINS = (Deno.env.get('CORS_ORIGINS') || '*').split(',').map(s => s.trim())
+
+function corsOrigin(origin) {
+  if (ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin)) return origin || '*'
+  return ALLOWED_ORIGINS[0] || '*'
+}
+
+function corsHeaders(origin) {
+  const o = corsOrigin(origin)
+  return {
+    'Access-Control-Allow-Origin': o,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-chat-bot-secret',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  }
+}
 
 function generateToken(bytes = 32) {
   const arr = new Uint8Array(bytes);
@@ -38,15 +55,20 @@ function getCookie(cookieHeader, name) {
 }
 
 export async function handler(request) {
+  const origin = request.headers.get('origin') || '*'
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders(origin) })
+  }
+
   const cookieHeader = request.headers.get('cookie') || '';
   const token = getCookie(cookieHeader, 'lb_session');
   if (!token || !TOKEN_ENCRYPTION_KEY) {
-    return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 });
+    return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   const session = await verifySession(token, TOKEN_ENCRYPTION_KEY);
   if (!session) {
-    return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 });
+    return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -60,7 +82,7 @@ export async function handler(request) {
     .maybeSingle();
 
   if (error || !streamer) {
-    return new Response(JSON.stringify({ error: 'streamer not found' }), { status: 404 });
+    return new Response(JSON.stringify({ error: 'streamer not found' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   const newToken = generateToken(32);
@@ -74,7 +96,7 @@ export async function handler(request) {
     .eq('id', session.streamerId);
 
   if (updateError) {
-    return new Response(JSON.stringify({ error: 'regeneration failed' }), { status: 500 });
+    return new Response(JSON.stringify({ error: 'regeneration failed' }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   await supabase.from('overlay_sessions')
@@ -93,6 +115,6 @@ export async function handler(request) {
       token: newToken,
       url: new URL(`/overlay.html?token=${newToken}`, NEXT_PUBLIC_APP_URL).toString(),
     }),
-    { headers: { 'Content-Type': 'application/json' } }
+    { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
   );
 }

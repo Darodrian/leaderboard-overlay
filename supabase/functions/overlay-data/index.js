@@ -1,13 +1,35 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const SUPABASE_URL = Deno.env.get('BASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY');
+
+const ALLOWED_ORIGINS = (Deno.env.get('CORS_ORIGINS') || '*').split(',').map(s => s.trim())
+
+function corsOrigin(origin) {
+  if (ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin)) return origin || '*'
+  return ALLOWED_ORIGINS[0] || '*'
+}
+
+function corsHeaders(origin) {
+  const o = corsOrigin(origin)
+  return {
+    'Access-Control-Allow-Origin': o,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-chat-bot-secret',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  }
+}
 
 export async function handler(request) {
+  const origin = request.headers.get('origin') || '*'
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders(origin) })
+  }
+
   const url = new URL(request.url);
   const token = url.searchParams.get('token');
   if (!token) {
-    return new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
+    return new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -21,12 +43,11 @@ export async function handler(request) {
     .maybeSingle();
 
   if (error || !streamer) {
-    return new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
+    return new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
-  // License check
   if (!streamer.license_key) {
-    return new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
+    return new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   const { data: license } = await supabase
@@ -36,10 +57,10 @@ export async function handler(request) {
     .maybeSingle();
 
   if (!license || !license.is_active) {
-    return new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
+    return new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
   if (license.expires_at && new Date(license.expires_at).getTime() <= Date.now()) {
-    return new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
+    return new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   let flushPending = false;
@@ -49,7 +70,7 @@ export async function handler(request) {
       { p_streamer_id: streamer.id }
     );
     if (flushError) {
-      return new Response(JSON.stringify({ error: 'flush failed' }), { status: 500 });
+      return new Response(JSON.stringify({ error: 'flush failed' }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
     }
     flushPending = flushed === false;
   }
@@ -60,7 +81,7 @@ export async function handler(request) {
     .eq('streamer_id', streamer.id);
 
   if (aggregateError) {
-    return new Response(JSON.stringify({ error: 'query failed' }), { status: 500 });
+    return new Response(JSON.stringify({ error: 'query failed' }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   const ALL_BOARD_TYPES = ['points', 'donations', 'bits', 'subs', 'raiders', 'chat_messages', 'clips'];
@@ -140,6 +161,6 @@ export async function handler(request) {
       activeWindow: boardStates[activeBoard]?.window ?? 'this_stream',
       pending: flushPending,
     }),
-    { headers: { 'Content-Type': 'application/json' } }
+    { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
   );
 }

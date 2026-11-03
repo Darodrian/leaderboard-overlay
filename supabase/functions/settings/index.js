@@ -1,8 +1,25 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const SUPABASE_URL = Deno.env.get('BASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY');
 const TOKEN_ENCRYPTION_KEY = Deno.env.get('TOKEN_ENCRYPTION_KEY');
+
+const ALLOWED_ORIGINS = (Deno.env.get('CORS_ORIGINS') || '*').split(',').map(s => s.trim())
+
+function corsOrigin(origin) {
+  if (ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin)) return origin || '*'
+  return ALLOWED_ORIGINS[0] || '*'
+}
+
+function corsHeaders(origin) {
+  const o = corsOrigin(origin)
+  return {
+    'Access-Control-Allow-Origin': o,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-chat-bot-secret',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  }
+}
 
 async function verifySession(token, secret, now = Date.now()) {
   const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 30;
@@ -90,15 +107,26 @@ function applySettings(current, partial) {
 }
 
 export async function handler(request) {
+  const origin = request.headers.get('origin') || '*'
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders(origin) })
+  }
+
   const cookieHeader = request.headers.get('cookie') || '';
   const token = getCookie(cookieHeader, 'lb_session');
   if (!token || !TOKEN_ENCRYPTION_KEY) {
-    return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 });
+    return new Response(JSON.stringify({ error: 'unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+    });
   }
 
   const session = await verifySession(token, TOKEN_ENCRYPTION_KEY);
   if (!session) {
-    return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 });
+    return new Response(JSON.stringify({ error: 'unauthorized' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+    });
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -113,7 +141,10 @@ export async function handler(request) {
       .maybeSingle();
 
     if (!streamer) {
-      return new Response(JSON.stringify({ error: 'streamer not found' }), { status: 404 });
+      return new Response(JSON.stringify({ error: 'streamer not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+      });
     }
 
     const settings = {
@@ -138,18 +169,24 @@ export async function handler(request) {
 
     return new Response(
       JSON.stringify({ settings, twitchLogin: streamer.twitch_login, obsToken: streamer.obs_token, licenseKey: streamer.license_key }),
-      { headers: { 'Content-Type': 'application/json' } }
+      { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
     );
   }
 
   if (request.method === 'PUT') {
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== 'object') {
-      return new Response(JSON.stringify({ error: 'invalid body' }), { status: 400 });
+      return new Response(JSON.stringify({ error: 'invalid body' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+      });
     }
     const candidate = body.settings ?? body;
     if (!candidate || typeof candidate !== 'object') {
-      return new Response(JSON.stringify({ error: 'invalid settings' }), { status: 400 });
+      return new Response(JSON.stringify({ error: 'invalid settings' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+      });
     }
 
     const { data: streamer } = await supabase
@@ -159,7 +196,10 @@ export async function handler(request) {
       .maybeSingle();
 
     if (!streamer) {
-      return new Response(JSON.stringify({ error: 'streamer not found' }), { status: 404 });
+      return new Response(JSON.stringify({ error: 'streamer not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+      });
     }
 
     const current = {
@@ -186,7 +226,10 @@ export async function handler(request) {
     try {
       next = applySettings(current, candidate);
     } catch {
-      return new Response(JSON.stringify({ error: 'invalid settings' }), { status: 400 });
+      return new Response(JSON.stringify({ error: 'invalid settings' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+      });
     }
 
     const { error } = await supabase
@@ -214,10 +257,12 @@ export async function handler(request) {
       .eq('id', streamer.id);
 
     if (error) {
-      return new Response(JSON.stringify({ error: 'save failed' }), { status: 500 });
+      return new Response(JSON.stringify({ error: 'save failed' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+      });
     }
 
-    // Broadcast settings update to overlay
     try {
       await fetch(`${SUPABASE_URL}/realtime/v1/api/broadcast`, {
         method: 'POST',
@@ -237,9 +282,12 @@ export async function handler(request) {
     } catch { /* broadcast failure is non-fatal */ }
 
     return new Response(JSON.stringify({ settings: next }), {
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
     });
   }
 
-  return new Response(JSON.stringify({ error: 'method not allowed' }), { status: 405 });
+  return new Response(JSON.stringify({ error: 'method not allowed' }), {
+    status: 405,
+    headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) },
+  });
 }

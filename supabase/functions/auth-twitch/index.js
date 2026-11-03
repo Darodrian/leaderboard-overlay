@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const SUPABASE_URL = Deno.env.get('BASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY');
 const TOKEN_ENCRYPTION_KEY = Deno.env.get('TOKEN_ENCRYPTION_KEY');
 const TWITCH_CLIENT_ID = Deno.env.get('TWITCH_CLIENT_ID');
 const TWITCH_CLIENT_SECRET = Deno.env.get('TWITCH_CLIENT_SECRET');
@@ -11,6 +11,23 @@ const OAUTH_STATE_COOKIE = 'twitch_oauth_state';
 const AUTHORIZE_URL = 'https://id.twitch.tv/oauth2/authorize';
 const TOKEN_URL = 'https://id.twitch.tv/oauth2/token';
 const USERS_URL = 'https://api.twitch.tv/helix/users';
+
+const ALLOWED_ORIGINS = (Deno.env.get('CORS_ORIGINS') || '*').split(',').map(s => s.trim())
+
+function corsOrigin(origin) {
+  if (ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin)) return origin || '*'
+  return ALLOWED_ORIGINS[0] || '*'
+}
+
+function corsHeaders(origin) {
+  const o = corsOrigin(origin)
+  return {
+    'Access-Control-Allow-Origin': o,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-chat-bot-secret',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  }
+}
 
 function generateToken(bytes = 16) {
   const arr = new Uint8Array(bytes);
@@ -45,8 +62,9 @@ async function encryptToken(plain, keyBase64) {
     key,
     new TextEncoder().encode(plain)
   );
-  const tag = new Uint8Array(encrypted).slice(-16);
-  const data = new Uint8Array(encrypted).slice(0, -16);
+  const enc = new Uint8Array(encrypted);
+  const tag = enc.slice(-16);
+  const data = enc.slice(0, -16);
   return [
     btoa(String.fromCharCode(...iv)),
     btoa(String.fromCharCode(...tag)),
@@ -56,6 +74,12 @@ async function encryptToken(plain, keyBase64) {
 
 export async function handler(request) {
   const url = new URL(request.url);
+  const origin = request.headers.get('origin') || '*'
+
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders(origin) })
+  }
+
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
@@ -71,14 +95,14 @@ export async function handler(request) {
     if (!code || !state || !storedState || state !== storedState) {
       return new Response(null, {
         status: 302,
-        headers: { Location: '/?error=twitch_login_failed' },
+        headers: { Location: '/?error=twitch_login_failed', ...corsHeaders(origin) },
       });
     }
 
     if (!TWITCH_CLIENT_ID || !TWITCH_CLIENT_SECRET || !TOKEN_ENCRYPTION_KEY) {
       return new Response(null, {
         status: 302,
-        headers: { Location: '/?error=twitch_not_configured' },
+        headers: { Location: '/?error=twitch_not_configured', ...corsHeaders(origin) },
       });
     }
 
@@ -87,7 +111,6 @@ export async function handler(request) {
       `${url.origin}/functions/v1/auth-twitch`;
 
     try {
-      // Exchange code for tokens
       const tokenRes = await fetch(TOKEN_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -103,13 +126,12 @@ export async function handler(request) {
       if (!tokenRes.ok) {
         return new Response(null, {
           status: 302,
-          headers: { Location: '/?error=twitch_login_failed' },
+          headers: { Location: '/?error=twitch_login_failed', ...corsHeaders(origin) },
         });
       }
 
       const tokens = await tokenRes.json();
 
-      // Fetch Twitch user
       const userRes = await fetch(USERS_URL, {
         headers: {
           'Client-Id': TWITCH_CLIENT_ID,
@@ -121,13 +143,12 @@ export async function handler(request) {
       if (!user?.id) {
         return new Response(null, {
           status: 302,
-          headers: { Location: '/?error=twitch_login_failed' },
+          headers: { Location: '/?error=twitch_login_failed', ...corsHeaders(origin) },
         });
       }
 
       const encryptedToken = await encryptToken(tokens.access_token, TOKEN_ENCRYPTION_KEY);
 
-      // Find or create streamer
       let streamerId;
       const { data: existing } = await supabase
         .from('streamers')
@@ -155,7 +176,6 @@ export async function handler(request) {
         streamerId = created.id;
       }
 
-      // Set session cookie
       const sessionToken = await signSession(
         { streamerId, twitchUserId: user.id },
         TOKEN_ENCRYPTION_KEY
@@ -163,7 +183,7 @@ export async function handler(request) {
 
       const response = new Response(null, {
         status: 302,
-        headers: { Location: '/dashboard.html' },
+        headers: { Location: '/dashboard.html', ...corsHeaders(origin) },
       });
       response.headers.set(
         'Set-Cookie',
@@ -177,7 +197,7 @@ export async function handler(request) {
     } catch {
       return new Response(null, {
         status: 302,
-        headers: { Location: '/?error=twitch_login_failed' },
+        headers: { Location: '/?error=twitch_login_failed', ...corsHeaders(origin) },
       });
     }
   }
@@ -185,7 +205,10 @@ export async function handler(request) {
   // ---- Start: redirect to Twitch OAuth ----
   const clientId = TWITCH_CLIENT_ID;
   if (!clientId) {
-    return new Response('Twitch OAuth is not configured', { status: 500 });
+    return new Response('Twitch OAuth is not configured', {
+      status: 500,
+      headers: corsHeaders(origin),
+    });
   }
 
   const redirectUri = url.searchParams.get('redirect') ||
@@ -202,7 +225,7 @@ export async function handler(request) {
 
   const response = new Response(null, {
     status: 302,
-    headers: { Location: authUrl.toString() },
+    headers: { Location: authUrl.toString(), ...corsHeaders(origin) },
   });
   response.headers.set(
     'Set-Cookie',

@@ -1,10 +1,32 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
 
-const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const SUPABASE_URL = Deno.env.get('BASE_URL');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY');
 const CHAT_BOT_SECRET = Deno.env.get('CHAT_BOT_SECRET');
 
+const ALLOWED_ORIGINS = (Deno.env.get('CORS_ORIGINS') || '*').split(',').map(s => s.trim())
+
+function corsOrigin(origin) {
+  if (ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin)) return origin || '*'
+  return ALLOWED_ORIGINS[0] || '*'
+}
+
+function corsHeaders(origin) {
+  const o = corsOrigin(origin)
+  return {
+    'Access-Control-Allow-Origin': o,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-chat-bot-secret',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  }
+}
+
 export async function handler(request) {
+  const origin = request.headers.get('origin') || '*'
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204, headers: corsHeaders(origin) })
+  }
+
   const url = new URL(request.url);
   const token = url.pathname.split('/').pop();
 
@@ -19,7 +41,7 @@ export async function handler(request) {
     .maybeSingle();
 
   if (!streamer) {
-    return new Response(JSON.stringify({ error: 'not found' }), { status: 404 });
+    return new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   const body = await request.json().catch(() => null);
@@ -30,7 +52,7 @@ export async function handler(request) {
   const isMod = body?.isMod === true;
 
   if (!userId || !username) {
-    return new Response(JSON.stringify({ error: 'userId and username required' }), { status: 400 });
+    return new Response(JSON.stringify({ error: 'userId and username required' }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   const shouldCount =
@@ -46,7 +68,7 @@ export async function handler(request) {
       is_broadcaster: isBroadcaster,
       is_mod: isMod,
     });
-    if (error) return new Response(JSON.stringify({ error: 'chat event failed' }), { status: 500 });
+    if (error) return new Response(JSON.stringify({ error: 'chat event failed' }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
   }
 
   await supabase.rpc('flush_streamer_aggregates', {
@@ -73,5 +95,5 @@ export async function handler(request) {
     });
   } catch { /* non-fatal */ }
 
-  return new Response(null, { status: 204 });
+  return new Response(null, { status: 204, headers: corsHeaders(origin) });
 }
