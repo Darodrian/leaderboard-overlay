@@ -52,7 +52,7 @@ function deepMerge(base, patch) {
       continue;
     }
     result[key] =
-      key === 'overrides' || key === 'boards'
+      key === 'overrides' || key === 'boards' || key === 'boardLabels'
         ? value
         : isPlainObject(value) && isPlainObject(result[key])
           ? deepMerge(result[key], value)

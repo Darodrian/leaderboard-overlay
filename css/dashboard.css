@@ -210,14 +210,14 @@ input[type="color"].color-input { width: 60px; height: 30px; border: 1px solid v
 }
 
 .preview-wrap {
-  position: relative; width: 100%; height: 180px; border-radius: 12px;
+  position: relative; width: 260px; height: 160px; border-radius: 12px;
   overflow: hidden; border: 1px solid var(--line); background: #000;
-  display: flex; align-items: center; justify-content: center;
   margin-bottom: 8px;
 }
 
 #preview {
-  width: 100%; height: 100%; border: 0; display: block;
+  width: 100%; height: auto; border: 0; display: block;
+  transform-origin: top left;
 }
 
 .panel-preview h2 { margin: 0 0 2px; }

@@ -61,7 +61,7 @@ function deepMerge(base, patch) {
   const result = { ...base };
   for (const [key, value] of Object.entries(patch)) {
     if (key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
-    if (key === 'overrides' || key === 'boards') {
+    if (key === 'overrides' || key === 'boards' || key === 'boardLabels') {
       result[key] = value;
     } else if (typeof value === 'object' && value !== null && !Array.isArray(value) &&
                typeof result[key] === 'object' && result[key] !== null && !Array.isArray(result[key])) {

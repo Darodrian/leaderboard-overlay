@@ -34,15 +34,6 @@
       <button type="button" id="btn-save" class="btn btn-indigo">Guardar configuración</button>
     </div>
 
-    <div class="section section--wide">
-      <h3>Vista previa</h3>
-      <p class="note">Cambios en tiempo real mientras ajustas la configuración.</p>
-      <div class="preview-wrap">
-        <iframe id="preview" title="Vista previa del overlay" src="about:blank"></iframe>
-      </div>
-      <p class="note" id="preview-note">Conecta tu cuenta de Twitch para ver el overlay.</p>
-    </div>
-
     <div class="settings-grid">
       <div class="section">
         <h3>Mostrar rangos</h3>
@@ -131,6 +122,15 @@
           <span>Top máximo</span>
           <input id="top-maximo" type="number" min="1" max="100" value="10" class="input">
         </label>
+      </div>
+
+      <div class="section">
+        <h3>Vista previa</h3>
+        <p class="note">Cambios en tiempo real mientras ajustas la configuración.</p>
+        <div class="preview-wrap">
+          <iframe id="preview" title="Vista previa del overlay" src="about:blank"></iframe>
+        </div>
+        <p class="note" id="preview-note">Conecta tu cuenta de Twitch para ver el overlay.</p>
       </div>
 
       <div class="section section--wide">
