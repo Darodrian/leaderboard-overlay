@@ -36,13 +36,20 @@ function setSaveStatus(text) {
   if (SAVE_STATUS) SAVE_STATUS.textContent = text;
 }
 
+function updateCopyButton() {
+  if (!BTN_COPY_URL) return;
+  BTN_COPY_URL.disabled = !obsToken;
+  BTN_COPY_URL.title = obsToken ? '' : 'Overlay URL is still loading';
+}
+
 function showConnected(connected) {
   if (CONNECTION_PANEL) CONNECTION_PANEL.hidden = false;
   if (CONNECTION_TITLE) CONNECTION_TITLE.textContent = connected ? 'Connected' : 'Connect Twitch';
   if (BTN_CONNECT) BTN_CONNECT.hidden = connected;
   if (CONNECTION_CONNECTED) CONNECTION_CONNECTED.hidden = !connected;
-  if (BTN_COPY_URL) BTN_COPY_URL.disabled = !connected;
+  if (BTN_COPY_URL) BTN_COPY_URL.hidden = !connected;
   if (CONNECTION_STATUS) CONNECTION_STATUS.textContent = connected ? ('Connected: ' + broadcasterLogin) : '';
+  updateCopyButton();
 }
 
 function buildOverlayUrl(token) {
@@ -174,7 +181,8 @@ async function loadSettings() {
     const res = await fetchJSON('/settings', { method: 'GET' });
     if (!res.ok) return;
     const data = await res.json();
-    obsToken = data.obsToken;
+    obsToken = data.obsToken || '';
+    updateCopyButton();
   } catch (e) {
     console.warn('[dashboard] load streamer failed', e);
   }
@@ -207,7 +215,10 @@ if (BTN_DISCONNECT) {
 // ---- Copy overlay URL ----
 if (BTN_COPY_URL) {
   BTN_COPY_URL.addEventListener('click', async () => {
-    if (!obsToken) return;
+    if (!obsToken) {
+      flash('Overlay URL is still loading — try again in a moment', 'err');
+      return;
+    }
     await copyText(buildOverlayUrl(obsToken));
   });
 }

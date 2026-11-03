@@ -9,23 +9,32 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="col-left">
-    <div class="msg" id="msg" hidden></div>
+  <div class="msg" id="msg" hidden></div>
 
-    <div id="connection-panel" class="panel">
+  <div id="connection-panel" class="panel connection-panel">
+    <div class="connection-copy">
       <h2 id="connection-title">Connect Twitch</h2>
+      <span id="connection-status" class="connection-status"></span>
+    </div>
+    <div class="connection-actions">
       <button type="button" id="btn-connect">Connect Twitch account</button>
-      <div id="connection-connected" hidden style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px;">
-        <span id="connection-status">Connected</span>
-        <button type="button" id="btn-disconnect" style="margin-left:auto;">Disconnect</button>
+      <div id="connection-connected" class="connection-connected" hidden>
+        <button type="button" id="btn-copy-url" disabled>Copy overlay URL</button>
+        <button type="button" id="btn-disconnect">Disconnect</button>
       </div>
-      <button type="button" id="btn-copy-url" disabled class="btn-wide" style="margin-top:8px;">Copy overlay URL</button>
+    </div>
+  </div>
+
+  <div id="settings-panel" class="panel settings-panel">
+    <div class="settings-head">
+      <div class="settings-head-copy">
+        <h2>Settings</h2>
+        <div class="save-status" id="save-status"></div>
+      </div>
+      <button type="button" id="btn-save" class="btn btn-indigo">Save settings</button>
     </div>
 
-    <div id="settings-panel" class="panel">
-      <h2>Settings</h2>
-      <div class="save-status" id="save-status" style="font-size:12px; color:var(--muted); margin-bottom:16px;"></div>
-
+    <div class="settings-grid">
       <div class="section">
         <h3>Rank display</h3>
         <label class="field row">
@@ -88,13 +97,13 @@
         </label>
       </div>
 
-      <div class="section">
+      <div class="section section--wide">
         <h3>Board modes</h3>
         <p class="note">Enable the boards you want to show on the overlay.</p>
         <div id="boards-list" class="space-y-2"></div>
       </div>
 
-      <div class="section">
+      <div class="section section--wide">
         <h3>Board labels</h3>
         <p class="note">Customize the display name for each board. Leave blank for default.</p>
         <div id="board-labels" class="space-y-2"></div>
@@ -209,8 +218,6 @@
         </label>
         <p class="note">Cycles through active boards and/or time windows.</p>
       </div>
-
-      <button type="button" id="btn-save" class="btn btn-indigo btn-wide">Save settings</button>
     </div>
   </div>
 </div>

@@ -27,7 +27,7 @@ async function verifySession(token, secret, now = Date.now()) {
   if (!payload || !signature) return null;
   const key = await crypto.subtle.importKey(
     'raw', new TextEncoder().encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' }, false, ['verify']
+    { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']
   );
   const expected = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
   const expectedB64 = btoa(String.fromCharCode(...new Uint8Array(expected)));
