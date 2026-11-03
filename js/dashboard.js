@@ -334,6 +334,8 @@ const FIELDS = {
   'theme-preset': { path: ['theme', 'preset'], type: 'select' },
   'rotation-enabled': { path: ['rotation', 'enabled'], type: 'checkbox' },
   'rotation-mode': { path: ['rotationMode'], type: 'select' },
+  'chat-exclude-broadcaster': { path: ['excludeBroadcasterFromChatMessages'], type: 'checkbox' },
+  'chat-exclude-mods': { path: ['excludeModsFromChatMessages'], type: 'checkbox' },
 };
 
 function getValue(el) {

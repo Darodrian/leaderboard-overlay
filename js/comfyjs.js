@@ -21,11 +21,11 @@ export function initComfyJS(channel, handlersArg) {
     });
 
     ComfyJS.onChat = (user, message, self, extra) => {
-      if (self) return;
       const msg = {
         userId: (extra && extra.userId) || '',
         username: user,
         text: message,
+        isSelf: !!self,
         badges: (extra && extra.badges) || {},
         isBot: (extra && extra.badges && extra.badges.bot) === '1',
         isBroadcaster: (extra && extra.badges && extra.badges.broadcaster) === '1',
