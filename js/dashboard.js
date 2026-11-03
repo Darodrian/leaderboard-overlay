@@ -1,35 +1,24 @@
 import { FUNCTIONS_BASE, APP_URL, SUPABASE_ANON_KEY } from './config.js';
+import {
+  applySettings, cssVars, DEFAULT_SETTINGS, THEMES, ALL_BOARD_TYPES, BOARD_LABELS, BOARD_UNITS, formatBoardQuantity,
+} from './js/settings.js';
 
 const $ = (id) => document.getElementById(id);
 
-const DOT_OV = $('dot-ov');
-const STATUS_OV = $('status-ov');
 const BTN_CONNECT = $('btn-connect');
+const BTN_DISCONNECT = $('btn-disconnect');
 const BTN_COPY_URL = $('btn-copy-url');
-const BTN_LOGOUT = $('btn-logout');
 const CONNECTION_PANEL = $('connection-panel');
 const CONNECTION_CONNECTED = $('connection-connected');
 const CONNECTION_TITLE = $('connection-title');
 const CONNECTION_STATUS = $('connection-status');
-const OBS_SECTION = $('obs-section');
-const OVERLAY_URL = $('overlay-url');
-const BTN_COPY_URL_OBS = $('btn-copy-url-obs');
-const BTN_REGEN = $('btn-regen-token');
-const SETTINGS_SECTION = $('settings-section');
-const BTN_OPEN_SETTINGS = $('btn-open-settings');
-const PREVIEW = $('preview');
-const PREVIEW_NOTE = $('preview-note');
 const MSG = $('msg');
+const SAVE_STATUS = $('save-status');
+const BTN_SAVE = $('btn-save');
 
 let broadcasterId = '';
 let broadcasterLogin = '';
 let obsToken = '';
-let overlayUrl = '';
-
-function setOverlay(kind, text) {
-  if (DOT_OV) DOT_OV.className = 'dot' + (kind ? ' ' + kind : '');
-  if (STATUS_OV) STATUS_OV.textContent = text;
-}
 
 function flash(text, kind = '') {
   if (!MSG) return;
@@ -43,6 +32,10 @@ function flash(text, kind = '') {
   }, 5000);
 }
 
+function setSaveStatus(text) {
+  if (SAVE_STATUS) SAVE_STATUS.textContent = text;
+}
+
 function showConnected(connected) {
   if (CONNECTION_PANEL) CONNECTION_PANEL.hidden = false;
   if (CONNECTION_TITLE) CONNECTION_TITLE.textContent = connected ? 'Connected' : 'Connect Twitch';
@@ -50,25 +43,12 @@ function showConnected(connected) {
   if (CONNECTION_CONNECTED) CONNECTION_CONNECTED.hidden = !connected;
   if (BTN_COPY_URL) BTN_COPY_URL.disabled = !connected;
   if (CONNECTION_STATUS) CONNECTION_STATUS.textContent = connected ? ('Connected: ' + broadcasterLogin) : '';
-  if (SETTINGS_SECTION) SETTINGS_SECTION.hidden = !connected;
-  setOverlay(connected ? 'live' : '', connected ? ('Channel: ' + broadcasterLogin) : 'No channel');
 }
 
 function buildOverlayUrl(token) {
   const base = new URL('overlay.html', location.href);
   base.search = 'token=' + encodeURIComponent(token);
   return base.href;
-}
-
-function updatePreview() {
-  if (obsToken) {
-    PREVIEW.src = buildOverlayUrl(obsToken);
-    PREVIEW.hidden = false;
-    PREVIEW_NOTE.textContent = 'Live preview: what you see is what goes into OBS.';
-  } else {
-    PREVIEW.hidden = true;
-    PREVIEW_NOTE.textContent = 'Connect your Twitch account to preview the overlay.';
-  }
 }
 
 function copyText(text) {
@@ -102,7 +82,6 @@ async function fetchJSON(path, opts = {}) {
 
 // ---- Session check ----
 async function checkSession() {
-  // Handle Twitch OAuth callback: ?connected=<login>&broadcaster_id=<id>
   const urlParams = new URLSearchParams(location.search);
   const connected = urlParams.get('connected');
   const broadcasterIdFromUrl = urlParams.get('broadcaster_id');
@@ -118,7 +97,7 @@ async function checkSession() {
     broadcasterLogin = connected;
     showConnected(true);
     window.history.replaceState({}, document.title, location.pathname);
-    await loadStreamer();
+    await loadSettings();
     return;
   }
 
@@ -132,22 +111,19 @@ async function checkSession() {
     broadcasterId = data.streamerId;
     broadcasterLogin = data.twitchLogin;
     showConnected(true);
-    await loadStreamer();
+    await loadSettings();
   } catch (e) {
     showConnected(false);
   }
 }
 
 // ---- Load streamer data ----
-async function loadStreamer() {
+async function loadSettings() {
   try {
     const res = await fetchJSON('/settings', { method: 'GET' });
     if (!res.ok) return;
     const data = await res.json();
     obsToken = data.obsToken;
-    if (OVERLAY_URL) OVERLAY_URL.textContent = buildOverlayUrl(obsToken);
-    if (OBS_SECTION) OBS_SECTION.hidden = false;
-    updatePreview();
   } catch (e) {
     console.warn('[dashboard] load streamer failed', e);
   }
@@ -162,9 +138,9 @@ if (BTN_CONNECT) {
   });
 }
 
-// ---- Logout ----
-if (BTN_LOGOUT) {
-  BTN_LOGOUT.addEventListener('click', async () => {
+// ---- Disconnect ----
+if (BTN_DISCONNECT) {
+  BTN_DISCONNECT.addEventListener('click', async () => {
     try {
       await fetchJSON('/auth-logout', { method: 'POST' });
     } catch { /* ignore */ }
@@ -172,10 +148,6 @@ if (BTN_LOGOUT) {
     broadcasterLogin = '';
     obsToken = '';
     showConnected(false);
-    BTN_CONNECT.hidden = false;
-    if (OBS_SECTION) OBS_SECTION.hidden = true;
-    if (SETTINGS_SECTION) SETTINGS_SECTION.hidden = true;
-    updatePreview();
     flash('Signed out');
   });
 }
@@ -188,37 +160,295 @@ if (BTN_COPY_URL) {
   });
 }
 
-if (BTN_COPY_URL_OBS) {
-  BTN_COPY_URL_OBS.addEventListener('click', async () => {
-    if (!obsToken) return;
-    await copyText(buildOverlayUrl(obsToken));
-  });
+// ==== Settings (always visible) ====
+let settings = structuredClone(DEFAULT_SETTINGS);
+
+const FIELDS = {
+  'display-ranks': { path: ['display', 'ranks'], type: 'checkbox' },
+  'display-medals': { path: ['display', 'medals'], type: 'checkbox' },
+  'display-rank-numbers': { path: ['display', 'rankNumbers'], type: 'checkbox' },
+  'display-bars': { path: ['display', 'bars'], type: 'checkbox' },
+  'display-amounts': { path: ['display', 'amounts'], type: 'checkbox' },
+  'hidden-accounts': { path: ['hiddenAccounts'], type: 'text' },
+  'points-tip': { path: ['pointConfig', 'tip'], type: 'number' },
+  'points-bit': { path: ['pointConfig', 'bit'], type: 'number' },
+  'points-sub': { path: ['pointConfig', 'sub'], type: 'number' },
+  'points-gift': { path: ['pointConfig', 'gift'], type: 'number' },
+  'points-raid': { path: ['pointConfig', 'raid'], type: 'number' },
+  'tip-threshold': { path: ['tipThresholdCents'], type: 'number' },
+  'anonymous-mask': { path: ['anonymousMaskName'], type: 'text' },
+  'screen-layout': { path: ['screenLayout'], type: 'select' },
+  'layout-width': { path: ['layout', 'width'], type: 'slider' },
+  'layout-padding': { path: ['layout', 'padding'], type: 'slider' },
+  'layout-radius': { path: ['layout', 'borderRadius'], type: 'slider' },
+  'visual-opacity': { path: ['visuals', 'opacity'], type: 'slider' },
+  'visual-font-size': { path: ['visuals', 'fontSize'], type: 'slider' },
+  'font-family': { path: ['fontFamily'], type: 'select' },
+  'label-alignment': { path: ['labelAlignment'], type: 'select' },
+  'theme-preset': { path: ['theme', 'preset'], type: 'select' },
+  'rotation-enabled': { path: ['rotation', 'enabled'], type: 'checkbox' },
+  'rotation-mode': { path: ['rotationMode'], type: 'select' },
+  'rotation-interval': { path: ['rotation', 'intervalMs'], type: 'number' },
+};
+
+function getValue(el) {
+  const type = el.dataset.type || el.type;
+  if (type === 'checkbox') return el.checked;
+  if (type === 'select-one') return el.value;
+  if (type === 'range') return Number(el.value);
+  if (type === 'number') return Number(el.value);
+  return el.value;
 }
 
-// ---- Regenerate token ----
-if (BTN_REGEN) {
-  BTN_REGEN.addEventListener('click', async () => {
-    if (!window.confirm('Regenerate the overlay URL? Old OBS sources will stop updating.')) return;
-    try {
-      const res = await fetchJSON('/overlay-regenerate', { method: 'POST' });
-      if (!res.ok) { flash('Regeneration failed', 'err'); return; }
-      const data = await res.json();
-      obsToken = data.token;
-      if (OVERLAY_URL) OVERLAY_URL.textContent = buildOverlayUrl(obsToken);
-      updatePreview();
-      flash('New URL active — update your OBS browser source');
-    } catch (e) {
-      flash('Regeneration failed', 'err');
+function setValue(el, val) {
+  const type = el.dataset.type || el.type;
+  if (type === 'checkbox') { el.checked = !!val; return; }
+  if (type === 'select-one') { el.value = val; return; }
+  if (type === 'range') { el.value = val; el.nextElementSibling?.textContent === undefined || (el.nextElementSibling.textContent = val + (el.id.includes('layout') ? ' px' : el.id.includes('visual') ? (el.id === 'visual-opacity' ? '%' : ' px') : '')); return; }
+  if (type === 'number') { el.value = val; return; }
+  el.value = val;
+}
+
+function setNested(obj, path, val) {
+  let cur = obj;
+  for (let i = 0; i < path.length - 1; i++) {
+    if (!cur[path[i]]) cur[path[i]] = {};
+    cur = cur[path[i]];
+  }
+  cur[path[path.length - 1]] = val;
+}
+
+function getNested(obj, path) {
+  let cur = obj;
+  for (const p of path) {
+    if (!cur || typeof cur !== 'object') return undefined;
+    cur = cur[p];
+  }
+  return cur;
+}
+
+function syncUI() {
+  for (const [id, def] of Object.entries(FIELDS)) {
+    const el = $(id);
+    if (!el) continue;
+    const val = getNested(settings, def.path);
+    setValue(el, val);
+  }
+
+  document.querySelectorAll('input[type="range"]').forEach((el) => {
+    const label = el.nextElementSibling;
+    if (label && label.tagName === 'SPAN') {
+      let suffix = '';
+      if (el.id === 'visual-opacity') suffix = '%';
+      else if (el.id.includes('layout')) suffix = ' px';
+      else if (el.id === 'visual-font-size') suffix = ' px';
+      label.textContent = el.value + suffix;
+    }
+  });
+
+  renderThemeColors();
+
+  const vars = cssVars(settings);
+  for (const [key, value] of Object.entries(vars)) {
+    document.documentElement.style.setProperty(key, value);
+  }
+}
+
+function renderThemeColors() {
+  const container = $('theme-colors');
+  const preset = THEMES[settings.theme.preset] ?? THEMES.midnight;
+  const fields = [
+    { key: '--lb-bg', label: 'Background color', default: preset.background },
+    { key: '--lb-text', label: 'Text color', default: preset.text },
+    { key: '--lb-accent', label: 'Accent color', default: preset.accent },
+    { key: '--lb-bar', label: 'Bar track color', default: preset.bar },
+    { key: '--lb-rank', label: 'Rank color', default: preset.accent },
+  ];
+  container.innerHTML = fields.map((f) => {
+    const val = settings.theme.overrides[f.key] ?? f.default;
+    return `
+      <label class="field">
+        <span>${f.label}</span>
+        <input type="color" id="color-${f.key.replace('--lb-','')}" value="${val}" class="color-input">
+      </label>
+    `;
+  }).join('');
+
+  fields.forEach((f) => {
+    const el = $('color-' + f.key.replace('--lb-', ''));
+    if (el) {
+      el.addEventListener('input', (e) => {
+        const overrides = { ...settings.theme.overrides };
+        overrides[f.key] = e.target.value;
+        settings = applySettings(settings, { theme: { overrides } });
+        syncUI();
+      });
     }
   });
 }
 
-// ---- Open settings ----
-if (BTN_OPEN_SETTINGS) {
-  BTN_OPEN_SETTINGS.addEventListener('click', () => {
-    const settingsUrl = new URL('settings.html', location.href).href;
-    window.open(settingsUrl, '_blank');
+function renderBoards() {
+  const container = $('boards-list');
+  container.innerHTML = ALL_BOARD_TYPES.map((board) => {
+    const cfg = settings.boards[board] || { active: false, windows: ['this_stream'], rankCount: 10 };
+    const windowsHtml = ['this_stream', '7d', '30d', 'alltime'].map((w) => {
+      const active = cfg.windows.includes(w);
+      return `
+        <button type="button" class="win-btn ${active ? 'active' : ''}" data-board="${board}" data-window="${w}">
+          ${w === 'this_stream' ? 'This Stream' : w}
+        </button>
+      `;
+    }).join('');
+    return `
+      <div class="board-section">
+        <label class="field row">
+          <input type="checkbox" id="board-active-${board}" ${cfg.active ? 'checked' : ''}>
+          <span>${BOARD_LABELS[board]}</span>
+          <span class="board-symbol">${BOARD_UNITS[board].symbol}</span>
+        </label>
+        <div class="board-windows">${windowsHtml}</div>
+        <label class="field">
+          <span>Max ranks</span>
+          <input id="board-rank-${board}" type="number" min="1" max="100" value="${cfg.rankCount}" class="input" data-board="${board}">
+        </label>
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('.win-btn').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      const board = e.target.dataset.board;
+      const window = e.target.dataset.window;
+      const cfg = settings.boards[board] || { active: true, windows: [], rankCount: 10 };
+      const windows = cfg.windows.includes(window)
+        ? cfg.windows.filter((w) => w !== window)
+        : [...cfg.windows, window];
+      settings = applySettings(settings, { boards: { ...settings.boards, [board]: { ...cfg, windows } } });
+      syncUI();
+    });
+  });
+
+  container.querySelectorAll('input[type="number"][data-board]').forEach((el) => {
+    el.addEventListener('change', (e) => {
+      const board = e.target.dataset.board;
+      const cfg = settings.boards[board] || {};
+      settings = applySettings(settings, { boards: { ...settings.boards, [board]: { ...cfg, rankCount: Number(e.target.value) || 10 } } });
+      syncUI();
+    });
+  });
+
+  container.querySelectorAll('input[type="checkbox"][id^="board-active-"]').forEach((el) => {
+    el.addEventListener('change', (e) => {
+      const board = e.target.id.replace('board-active-', '');
+      const cfg = settings.boards[board] || {};
+      settings = applySettings(settings, { boards: { ...settings.boards, [board]: { ...cfg, active: e.target.checked } } });
+      syncUI();
+    });
   });
 }
 
+function renderBoardLabels() {
+  const container = $('board-labels');
+  container.innerHTML = ALL_BOARD_TYPES.map((board) => {
+    const val = settings.boardLabels[board] ?? '';
+    return `
+      <div class="field row">
+        <span class="board-label-name">${BOARD_LABELS[board]}</span>
+        <input id="board-label-${board}" type="text" placeholder="${BOARD_LABELS[board]}" value="${val}" class="input" data-board="${board}">
+      </div>
+    `;
+  }).join('');
+
+  container.querySelectorAll('input[data-board]').forEach((el) => {
+    el.addEventListener('input', (e) => {
+      const board = e.target.dataset.board;
+      const boardLabels = { ...settings.boardLabels };
+      if (e.target.value) boardLabels[board] = e.target.value;
+      else delete boardLabels[board];
+      settings = applySettings(settings, { theme: { ...settings.theme, boardLabels } });
+      syncUI();
+    });
+  });
+}
+
+Object.entries(FIELDS).forEach(([id, def]) => {
+  const el = $(id);
+  if (!el) return;
+  const event = def.type === 'slider' ? 'input' : def.type === 'number' ? 'change' : 'change';
+  el.addEventListener(event, (e) => {
+    const val = getValue(el);
+    settings = applySettings(settings, { [def.path.join('.')]: val });
+    syncUI();
+  });
+});
+
+$('hidden-accounts').addEventListener('input', (e) => {
+  settings = applySettings(settings, {
+    hiddenAccounts: e.target.value.split(',').map((a) => a.trim()).filter(Boolean),
+  });
+  syncUI();
+});
+
+$('rotation-interval').addEventListener('change', (e) => {
+  settings = applySettings(settings, { rotation: { intervalMs: (Number(e.target.value) || 30) * 1000 } });
+  syncUI();
+});
+
+async function loadServerSettings() {
+  try {
+    const res = await fetchJSON('/settings', { method: 'GET' });
+    if (!res.ok) {
+      setSaveStatus('Could not load settings');
+      return;
+    }
+    const data = await res.json();
+    if (data.settings) {
+      settings = applySettings(DEFAULT_SETTINGS, data.settings);
+      syncUI();
+      renderBoards();
+      renderBoardLabels();
+    }
+  } catch (e) {
+    console.warn('[settings] load failed', e);
+  }
+}
+
+BTN_SAVE.addEventListener('click', async () => {
+  BTN_SAVE.disabled = true;
+  BTN_SAVE.textContent = 'Saving…';
+  setSaveStatus('Saving…');
+  try {
+    const res = await fetchJSON('/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ settings }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      setSaveStatus('Save failed: ' + (data.error || 'unknown error'));
+      flash('Save failed', 'err');
+      return;
+    }
+    const data = await res.json();
+    settings = applySettings(DEFAULT_SETTINGS, data.settings);
+    syncUI();
+    renderBoards();
+    renderBoardLabels();
+    setSaveStatus('Saved — overlay updated');
+    flash('Settings saved');
+  } catch (e) {
+    setSaveStatus('Save failed');
+    flash('Save failed', 'err');
+  } finally {
+    BTN_SAVE.disabled = false;
+    BTN_SAVE.textContent = 'Save settings';
+  }
+});
+
+// ---- Init ----
+syncUI();
+renderBoards();
+renderBoardLabels();
+loadServerSettings();
 checkSession();
