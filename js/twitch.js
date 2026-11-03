@@ -1,4 +1,4 @@
-import { TWITCH_CLIENT_ID, NEXT_PUBLIC_APP_URL, FUNCTIONS_BASE } from './config.js';
+import { TWITCH_CLIENT_ID, APP_URL, FUNCTIONS_BASE } from './config.js';
 
 export const DEFAULT_SCOPES = ['user:read:email', 'moderator:read:chatters'];
 export const OAUTH_STATE_COOKIE = 'twitch_oauth_state';

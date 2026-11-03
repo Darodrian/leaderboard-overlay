@@ -1,4 +1,4 @@
-import { FUNCTIONS_BASE, NEXT_PUBLIC_APP_URL } from './config.js';
+import { FUNCTIONS_BASE, APP_URL } from './config.js';
 
 const $ = (id) => document.getElementById(id);
 

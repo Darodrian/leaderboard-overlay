@@ -3,7 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.117.2';
 const SUPABASE_URL = Deno.env.get('BASE_URL');
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SERVICE_ROLE_KEY');
 const TOKEN_ENCRYPTION_KEY = Deno.env.get('TOKEN_ENCRYPTION_KEY');
-const NEXT_PUBLIC_APP_URL = Deno.env.get('APP_URL') || 'http://localhost:3000';
+const APP_URL = Deno.env.get('APP_URL') || 'http://localhost:3000';
 
 const ALLOWED_ORIGINS = (Deno.env.get('CORS_ORIGINS') || '*').split(',').map(s => s.trim())
 
@@ -113,7 +113,7 @@ export async function handler(request) {
   return new Response(
     JSON.stringify({
       token: newToken,
-      url: new URL(`/overlay.html?token=${newToken}`, NEXT_PUBLIC_APP_URL).toString(),
+      url: new URL(`/overlay.html?token=${newToken}`, APP_URL).toString(),
     }),
     { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
   );
