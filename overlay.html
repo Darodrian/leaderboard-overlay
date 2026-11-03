@@ -6,7 +6,7 @@
 <title>Leaderboard Overlay</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="./css/overlay.css">
-<script src="https://cdn.jsdelivr.net/npm/comfy.js@0.0.12/dist/comfy.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/comfy.js@latest/dist/comfy.min.js"></script>
 </head>
 <body>
 <div id="setup-notice" hidden>
@@ -74,7 +74,13 @@ function renderBoard(board, rows, window) {
   const max = Math.max(1, ...visible.map((row) => row.quantity));
   const showRank = settings.display.ranks;
   const boardLabel = settings.boardLabels ? (settings.boardLabels[board] || BOARD_LABELS[board]) : BOARD_LABELS[board];
-  const windowLabel = window.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+  const WINDOW_LABELS_ES = {
+    this_stream: 'Este stream',
+    '7d': '7d',
+    '30d': '30d',
+    alltime: 'Siempre',
+  };
+  const windowLabel = WINDOW_LABELS_ES[window] ?? window;
 
   const itemsHtml = visible.map((row, index) => {
     const rank = index + 1;

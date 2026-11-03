@@ -62,7 +62,7 @@ function updatePreview() {
   const wrap = PREVIEW_IFRAME.parentElement;
   const wrapWidth = wrap ? wrap.clientWidth : 260;
   const layoutWidth = settings.layout.width || 420;
-  const scale = Math.min(1, wrapWidth / layoutWidth);
+  const scale = Math.min(0.85, wrapWidth / layoutWidth * 1.15);
   PREVIEW_IFRAME.style.width = layoutWidth + 'px';
   PREVIEW_IFRAME.style.transform = 'scale(' + scale + ')';
   PREVIEW_IFRAME.style.transformOrigin = 'top left';

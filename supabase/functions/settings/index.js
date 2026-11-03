@@ -231,7 +231,15 @@ export async function handler(request) {
 
     let next;
     try {
+      console.log('[settings] PUT candidate boardLabels:', JSON.stringify(candidate?.boardLabels));
+      console.log('[settings] PUT current boardLabels:', JSON.stringify(current.boardLabels));
       next = applySettings(current, candidate);
+      console.log('[settings] PUT next boardLabels:', JSON.stringify(next.boardLabels));
+      // Safety net: boardLabels must be wholesale-replaced, not deep-merged.
+      // deep-merge would preserve deleted keys from the base object.
+      if (candidate && typeof candidate.boardLabels === 'object' && !Array.isArray(candidate.boardLabels)) {
+        next.boardLabels = candidate.boardLabels;
+      }
     } catch {
       return new Response(JSON.stringify({ error: 'invalid settings' }), {
         status: 400,
