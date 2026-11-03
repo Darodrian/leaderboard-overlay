@@ -102,6 +102,26 @@ async function fetchJSON(path, opts = {}) {
 
 // ---- Session check ----
 async function checkSession() {
+  // Handle Twitch OAuth callback: ?connected=<login>&broadcaster_id=<id>
+  const urlParams = new URLSearchParams(location.search);
+  const connected = urlParams.get('connected');
+  const broadcasterIdFromUrl = urlParams.get('broadcaster_id');
+  const error = urlParams.get('error');
+
+  if (error) {
+    flash('Twitch connection failed: ' + error, 'err');
+    window.history.replaceState({}, document.title, location.pathname);
+  }
+
+  if (connected && broadcasterIdFromUrl) {
+    broadcasterId = broadcasterIdFromUrl;
+    broadcasterLogin = connected;
+    showConnected(true);
+    window.history.replaceState({}, document.title, location.pathname);
+    await loadStreamer();
+    return;
+  }
+
   try {
     const res = await fetchJSON('/auth-session');
     if (!res.ok) {
@@ -135,25 +155,10 @@ async function loadStreamer() {
 
 // ---- Connect Twitch ----
 if (BTN_CONNECT) {
-  BTN_CONNECT.addEventListener('click', async () => {
-    const callbackUrl = new URL('auth-callback.html', location.href).href;
-    const authUrl = `${FUNCTIONS_BASE}/auth-twitch?redirect=${encodeURIComponent(callbackUrl)}`;
-    try {
-      const res = await fetch(authUrl, {
-        method: 'GET',
-        redirect: 'manual',
-        credentials: 'include',
-        headers: { apikey: SUPABASE_ANON_KEY },
-      });
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        flash('Twitch login failed', 'err');
-        return;
-      }
-      location.href = data.twitchUrl;
-    } catch (e) {
-      flash('Twitch login failed', 'err');
-    }
+  BTN_CONNECT.addEventListener('click', () => {
+    const redirect = new URL('.', location.href).href;
+    const authUrl = `${FUNCTIONS_BASE}/auth-twitch?redirect=${encodeURIComponent(redirect)}`;
+    location.href = authUrl;
   });
 }
 

@@ -93,17 +93,17 @@ export async function handler(request) {
     const storedState = getCookie(cookieHeader, OAUTH_STATE_COOKIE);
 
     if (!code || !incomingState || !storedState || incomingState !== storedState) {
-      return new Response(
-        JSON.stringify({ error: 'twitch_login_failed' }),
-        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
-      );
+      return new Response(null, {
+        status: 302,
+        headers: { Location: '/?error=twitch_login_failed', ...corsHeaders(origin) },
+      });
     }
 
     if (!TWITCH_CLIENT_ID || !TWITCH_CLIENT_SECRET || !TOKEN_ENCRYPTION_KEY) {
-      return new Response(
-        JSON.stringify({ error: 'twitch_not_configured' }),
-        { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
-      );
+      return new Response(null, {
+        status: 302,
+        headers: { Location: '/?error=twitch_not_configured', ...corsHeaders(origin) },
+      });
     }
 
     const redirectUri =
@@ -124,10 +124,10 @@ export async function handler(request) {
       });
 
       if (!tokenRes.ok) {
-        return new Response(
-          JSON.stringify({ error: 'twitch_login_failed' }),
-          { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
-        );
+        return new Response(null, {
+          status: 302,
+          headers: { Location: '/?error=twitch_login_failed', ...corsHeaders(origin) },
+        });
       }
 
       const tokens = await tokenRes.json();
@@ -141,10 +141,10 @@ export async function handler(request) {
       const userJson = await userRes.json();
       const user = userJson.data?.[0];
       if (!user?.id) {
-        return new Response(
-          JSON.stringify({ error: 'twitch_login_failed' }),
-          { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
-        );
+        return new Response(null, {
+          status: 302,
+          headers: { Location: '/?error=twitch_login_failed', ...corsHeaders(origin) },
+        });
       }
 
       const encryptedToken = await encryptToken(tokens.access_token, TOKEN_ENCRYPTION_KEY);
@@ -181,10 +181,14 @@ export async function handler(request) {
         TOKEN_ENCRYPTION_KEY
       );
 
-      const response = new Response(
-        JSON.stringify({ redirectUrl: '/dashboard.html' }),
-        { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
-      );
+      const dashboardUrl = new URL('/dashboard.html', url.origin);
+      dashboardUrl.searchParams.set('connected', user.login);
+      dashboardUrl.searchParams.set('broadcaster_id', streamerId);
+
+      const response = new Response(null, {
+        status: 302,
+        headers: { Location: dashboardUrl.toString(), ...corsHeaders(origin) },
+      });
       response.headers.set(
         'Set-Cookie',
         `lb_session=${sessionToken}; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`
@@ -195,20 +199,20 @@ export async function handler(request) {
       );
       return response;
     } catch {
-      return new Response(
-        JSON.stringify({ error: 'twitch_login_failed' }),
-        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
-      );
+      return new Response(null, {
+        status: 302,
+        headers: { Location: '/?error=twitch_login_failed', ...corsHeaders(origin) },
+      });
     }
   }
 
   // ---- Start: redirect to Twitch OAuth ----
   const clientId = TWITCH_CLIENT_ID;
   if (!clientId) {
-    return new Response(
-      JSON.stringify({ error: 'Twitch OAuth is not configured' }),
-      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
-    );
+    return new Response('Twitch OAuth is not configured', {
+      status: 500,
+      headers: corsHeaders(origin),
+    });
   }
 
   const redirectUri = url.searchParams.get('redirect') ||
@@ -223,10 +227,10 @@ export async function handler(request) {
   authUrl.searchParams.set('scope', 'user:read:email moderator:read:chatters');
   authUrl.searchParams.set('state', state);
 
-  const response = new Response(
-    JSON.stringify({ twitchUrl: authUrl.toString() }),
-    { headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
-  );
+  const response = new Response(null, {
+    status: 302,
+    headers: { Location: authUrl.toString(), ...corsHeaders(origin) },
+  });
   response.headers.set(
     'Set-Cookie',
     `twitch_oauth_state=${state}; Path=/; HttpOnly; SameSite=None; Secure; Max-Age=600`
