@@ -103,7 +103,7 @@ async function fetchJSON(path, opts = {}) {
 // ---- Session check ----
 async function checkSession() {
   try {
-    const res = await fetchJSON('/auth/session');
+    const res = await fetchJSON('/auth-session');
     if (!res.ok) {
       showConnected(false);
       return;
