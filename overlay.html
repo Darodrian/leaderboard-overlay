@@ -133,15 +133,28 @@ function render() {
 function startRotation() {
   if (!state) return;
 
-  const activeBoards = Object.entries(state.settings.boards)
+  const s = state.settings;
+  const activeBoards = Object.entries(s.boards)
     .filter(([, cfg]) => cfg.active)
     .map(([board]) => board);
+
+  // Rotation only makes sense in single-board layout; in stacked all boards show at once.
+  if (s.screenLayout !== 'single' || !s.rotation.enabled || activeBoards.length === 0) {
+    if (rotationTimer !== null) {
+      clearInterval(rotationTimer);
+      rotationTimer = null;
+    }
+    return;
+  }
+
   const signature = [
-    state.settings.screenLayout,
-    state.settings.rotation.enabled,
-    state.settings.rotation.intervalMs,
-    state.settings.rotationMode,
+    s.screenLayout,
+    s.rotation.enabled,
+    s.rotation.intervalMs,
+    s.rotationMode,
     activeBoards.join(','),
+    activeBoard,
+    activeWindow,
   ].join('|');
 
   if (rotationTimer !== null && signature === rotationSignature) return;
@@ -151,39 +164,53 @@ function startRotation() {
     clearInterval(rotationTimer);
     rotationTimer = null;
   }
-  if (state.settings.screenLayout !== 'single' || !state.settings.rotation.enabled || activeBoards.length === 0) return;
+
+  // Per-board window index, so window rotation remembers where each board left off.
+  const boardWindowIdx = {};
+  activeBoards.forEach((b) => {
+    const windows = s.boards[b]?.windows || ['this_stream'];
+    boardWindowIdx[b] = windows.indexOf(activeWindow) !== -1 ? windows.indexOf(activeWindow) : 0;
+  });
 
   let bi = activeBoards.indexOf(activeBoard);
   if (bi === -1) bi = 0;
 
-  const intervalMs = state.settings.rotation.intervalMs;
-  rotationTimer = window.setInterval(() => {
-    const s = state.settings;
-    let nextBoard = activeBoards[bi];
-    let nextWindow = activeWindow;
+  const intervalMs = s.rotation.intervalMs;
+  const mode = s.rotationMode;
 
-    if (s.rotationMode === 'boards' || s.rotationMode === 'both') {
-      bi = bi === activeBoards.length - 1 ? 0 : bi + 1;
-      nextBoard = activeBoards[bi];
-      const bs = state.boards[nextBoard];
-      nextWindow = bs ? bs.window : nextWindow;
-    }
+  const tick = () => {
+    const windows = s.boards[activeBoard]?.windows || ['this_stream'];
 
-    if (s.rotationMode === 'windows' || s.rotationMode === 'both') {
-      if (s.rotationMode === 'windows') {
-        nextBoard = activeBoards[bi];
+    if (mode === 'windows') {
+      const wi = boardWindowIdx[activeBoard] ?? 0;
+      const nextWi = (wi + 1) % windows.length;
+      boardWindowIdx[activeBoard] = nextWi;
+      activeWindow = windows[nextWi];
+    } else if (mode === 'boards') {
+      bi = (bi + 1) % activeBoards.length;
+      activeBoard = activeBoards[bi];
+      const bw = boardWindowIdx[activeBoard] ?? 0;
+      const bwindows = s.boards[activeBoard]?.windows || ['this_stream'];
+      activeWindow = bwindows[bw] || bwindows[0];
+    } else if (mode === 'both') {
+      const wi = boardWindowIdx[activeBoard] ?? 0;
+      if (wi === windows.length - 1) {
+        bi = (bi + 1) % activeBoards.length;
+        activeBoard = activeBoards[bi];
+        const bwindows = s.boards[activeBoard]?.windows || ['this_stream'];
+        boardWindowIdx[activeBoard] = 0;
+        activeWindow = bwindows[0];
+      } else {
+        boardWindowIdx[activeBoard] = wi + 1;
+        activeWindow = windows[wi + 1];
       }
-      const boardWindows = s.boards[nextBoard] ? s.boards[nextBoard].windows : ['this_stream'];
-      const wi = boardWindows.indexOf(nextWindow);
-      const nextWi = wi === -1 || wi === boardWindows.length - 1 ? 0 : wi + 1;
-      nextWindow = boardWindows[nextWi];
     }
 
-    activeBoard = nextBoard;
-    activeWindow = nextWindow;
     const bs = state.boards[activeBoard];
     root.innerHTML = '<div class="lb-panel">' + renderBoard(activeBoard, bs ? bs.rows : [], activeWindow) + '</div>';
-  }, intervalMs);
+  };
+
+  rotationTimer = window.setInterval(tick, intervalMs);
 }
 
 function startComfyJS() {

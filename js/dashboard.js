@@ -410,6 +410,10 @@ function renderBoards() {
           <span>Max ranks</span>
           <input id="board-rank-${board}" type="number" min="1" max="100" value="${cfg.rankCount}" class="input" data-board="${board}">
         </label>
+        <label class="field">
+          <span>Board label</span>
+          <input id="board-label-${board}" type="text" placeholder="${BOARD_LABELS[board]}" value="${settings.boardLabels[board] ?? ''}" class="input" data-board="${board}">
+        </label>
       </div>
     `;
   }).join('');
@@ -445,21 +449,7 @@ function renderBoards() {
       syncUI();
     });
   });
-}
-
-function renderBoardLabels() {
-  const container = $('board-labels');
-  container.innerHTML = ALL_BOARD_TYPES.map((board) => {
-    const val = settings.boardLabels[board] ?? '';
-    return `
-      <div class="field row">
-        <span class="board-label-name">${BOARD_LABELS[board]}</span>
-        <input id="board-label-${board}" type="text" placeholder="${BOARD_LABELS[board]}" value="${val}" class="input" data-board="${board}">
-      </div>
-    `;
-  }).join('');
-
-  container.querySelectorAll('input[data-board]').forEach((el) => {
+  container.querySelectorAll('input[id^="board-label-"]').forEach((el) => {
     el.addEventListener('input', (e) => {
       const board = e.target.dataset.board;
       const boardLabels = { ...settings.boardLabels };
@@ -494,6 +484,14 @@ $('rotation-interval').addEventListener('change', (e) => {
   syncUI();
 });
 
+const BTN_THEME_RESET = $('theme-reset');
+if (BTN_THEME_RESET) {
+  BTN_THEME_RESET.addEventListener('click', () => {
+    settings = applySettings(settings, { theme: { overrides: {} } });
+    syncUI();
+  });
+}
+
 async function loadServerSettings() {
   try {
     const res = await fetchJSON('/settings', { method: 'GET' });
@@ -508,7 +506,6 @@ async function loadServerSettings() {
       settings = applySettings(DEFAULT_SETTINGS, data.settings);
       syncUI();
       renderBoards();
-      renderBoardLabels();
     }
     await startRoom();
   } catch (e) {
@@ -536,12 +533,6 @@ BTN_SAVE.addEventListener('click', async () => {
     settings = applySettings(DEFAULT_SETTINGS, data.settings);
     syncUI();
     renderBoards();
-    renderBoardLabels();
-    if (bridge) {
-      bridge.send('settings.update', { settings });
-    } else {
-      startRoom();
-    }
     setSaveStatus('Saved — overlay updated');
     flash('Settings saved');
   } catch (e) {
@@ -556,5 +547,4 @@ BTN_SAVE.addEventListener('click', async () => {
 // ---- Init ----
 syncUI();
 renderBoards();
-renderBoardLabels();
 checkSession();

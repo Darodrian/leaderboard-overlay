@@ -117,6 +117,7 @@ export async function handler(request) {
   const activeBoard = ALL_BOARD_TYPES.find((bt) => boards[bt]?.active) ?? 'points';
 
   const settings = {
+    twitchLogin: streamer.twitch_login,
     pointConfig: streamer.point_config,
     tipThresholdCents: streamer.tip_threshold_cents,
     anonymousMaskName: streamer.anonymous_mask_name,

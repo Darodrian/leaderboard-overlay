@@ -1,5 +1,5 @@
 export const DEFAULT_BOARDS = {
-  points: { active: true, windows: ['this_stream', '7d', '30d', 'alltime'], rankCount: 25 },
+  points: { active: true, windows: ['this_stream', '7d', '30d', 'alltime'], rankCount: 10 },
   donations: { active: false, windows: ['this_stream', '7d', '30d', 'alltime'], rankCount: 10 },
   bits: { active: false, windows: ['this_stream', '7d', '30d', 'alltime'], rankCount: 10 },
   subs: { active: false, windows: ['this_stream', '7d', '30d', 'alltime'], rankCount: 10 },
@@ -109,7 +109,6 @@ function clampSettings(settings) {
 
   if (
     settings.screenLayout !== 'single' &&
-    settings.screenLayout !== 'side-by-side' &&
     settings.screenLayout !== 'stacked'
   ) {
     settings.screenLayout = DEFAULT_SETTINGS.screenLayout;

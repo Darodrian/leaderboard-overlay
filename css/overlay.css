@@ -1,4 +1,19 @@
 /* OBS overlay */
+@font-face {
+  font-family: 'Coming Soon';
+  src: url('/fonts/ComingSoon-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Z Pix';
+  src: url('/fonts/zpix.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 html, body {
   margin: 0;
   padding: 0;
@@ -38,6 +53,13 @@ html, body {
   display: flex;
   flex-direction: column;
   gap: var(--lb-padding, 12px);
+}
+
+.lb-layout-stacked .lb-board {
+  background: var(--lb-bg, #0b1020);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--lb-radius, 16px);
+  padding: var(--lb-padding, 12px);
 }
 
 .lb-board {
