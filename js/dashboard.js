@@ -142,6 +142,7 @@ if (BTN_CONNECT) {
       const res = await fetch(authUrl, {
         method: 'GET',
         redirect: 'manual',
+        credentials: 'include',
         headers: { apikey: SUPABASE_ANON_KEY },
       });
       const data = await res.json();

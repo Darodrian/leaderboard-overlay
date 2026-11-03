@@ -15,7 +15,7 @@ const USERS_URL = 'https://api.twitch.tv/helix/users';
 const ALLOWED_ORIGINS = (Deno.env.get('CORS_ORIGINS') || '*').split(',').map(s => s.trim())
 
 function corsOrigin(origin) {
-  if (ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin)) return origin || '*'
+  if (origin && origin !== '*' && (ALLOWED_ORIGINS.includes('*') || ALLOWED_ORIGINS.includes(origin))) return origin
   return ALLOWED_ORIGINS[0] || '*'
 }
 
@@ -86,13 +86,13 @@ export async function handler(request) {
 
   // ---- Callback: Twitch redirects back with ?code and ?state ----
   const code = url.searchParams.get('code');
-  const state = url.searchParams.get('state');
+  const incomingState = url.searchParams.get('state');
 
   if (code) {
     const cookieHeader = request.headers.get('cookie') || '';
     const storedState = getCookie(cookieHeader, OAUTH_STATE_COOKIE);
 
-    if (!code || !state || !storedState || state !== storedState) {
+    if (!code || !incomingState || !storedState || incomingState !== storedState) {
       return new Response(
         JSON.stringify({ error: 'twitch_login_failed' }),
         { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } }
