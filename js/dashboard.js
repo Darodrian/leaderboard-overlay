@@ -44,7 +44,7 @@ function setSaveStatus(text) {
 function updateCopyButton() {
   if (!BTN_COPY_URL) return;
   BTN_COPY_URL.disabled = !obsToken;
-  BTN_COPY_URL.title = obsToken ? '' : 'Overlay URL is still loading';
+  BTN_COPY_URL.title = obsToken ? '' : 'La URL del overlay todavía se está cargando';
 }
 
 function updatePreview() {
@@ -63,11 +63,11 @@ function updatePreview() {
 
 function showConnected(connected) {
   if (CONNECTION_PANEL) CONNECTION_PANEL.hidden = false;
-  if (CONNECTION_TITLE) CONNECTION_TITLE.textContent = connected ? 'Connected' : 'Connect Twitch';
+  if (CONNECTION_TITLE) CONNECTION_TITLE.textContent = connected ? 'Conectado' : 'Conectar Twitch';
   if (BTN_CONNECT) BTN_CONNECT.hidden = connected;
   if (CONNECTION_CONNECTED) CONNECTION_CONNECTED.hidden = !connected;
   if (BTN_COPY_URL) BTN_COPY_URL.hidden = !connected;
-  if (CONNECTION_STATUS) CONNECTION_STATUS.textContent = connected ? ('Connected: ' + broadcasterLogin) : '';
+  if (CONNECTION_STATUS) CONNECTION_STATUS.textContent = connected ? ('Conectado: ' + broadcasterLogin) : '';
   updateCopyButton();
 }
 
@@ -79,7 +79,7 @@ function buildOverlayUrl(token) {
 
 function copyText(text) {
   return navigator.clipboard.writeText(text).then(() => {
-    flash('Copied to clipboard');
+    flash('Copiado al portapapeles');
   }).catch(() => {
     const ta = document.createElement('textarea');
     ta.value = text;
@@ -89,7 +89,7 @@ function copyText(text) {
     ta.select();
     try { document.execCommand('copy'); } catch { /* no clipboard */ }
     ta.remove();
-    flash('Copy failed — select manually');
+    flash('Error al copiar — selecciona manualmente');
   });
 }
 
@@ -169,7 +169,7 @@ async function checkSession() {
   }
 
   if (error) {
-    flash('Twitch connection failed: ' + error, 'err');
+    flash('Error de conexión de Twitch: ' + error, 'err');
     window.history.replaceState({}, document.title, location.pathname);
   }
 
@@ -241,7 +241,7 @@ if (BTN_DISCONNECT) {
     }
     showConnected(false);
     setSaveStatus('');
-    flash('Signed out');
+    flash('Sesión cerrada');
   });
 }
 
@@ -249,7 +249,7 @@ if (BTN_DISCONNECT) {
 if (BTN_COPY_URL) {
   BTN_COPY_URL.addEventListener('click', async () => {
     if (!obsToken) {
-      flash('Overlay URL is still loading — try again in a moment', 'err');
+      flash('La URL del overlay todavía se está cargando — inténtalo de nuevo en un momento', 'err');
       return;
     }
     await copyText(buildOverlayUrl(obsToken));
@@ -335,6 +335,20 @@ function syncUI() {
   const rotationInput = $('rotation-interval');
   if (rotationInput) rotationInput.value = Math.round(settings.rotation.intervalMs / 1000);
 
+  ['this_stream', '7d', '30d', 'alltime'].forEach((w) => {
+    const el = $('win-' + w);
+    if (el) {
+      const allActive = Object.values(settings.boards).every((cfg) => cfg.windows.includes(w));
+      el.checked = allActive;
+    }
+  });
+
+  const topInput = $('top-maximo');
+  if (topInput && settings.boards) {
+    const first = Object.values(settings.boards)[0];
+    topInput.value = first ? first.rankCount : 10;
+  }
+
   document.querySelectorAll('input[type="range"]').forEach((el) => {
     const label = el.nextElementSibling;
     if (label && label.tagName === 'SPAN') {
@@ -408,14 +422,6 @@ function renderBoards() {
   const container = $('boards-list');
   container.innerHTML = ALL_BOARD_TYPES.map((board) => {
     const cfg = settings.boards[board] || { active: false, windows: ['this_stream'], rankCount: 10 };
-    const windowsHtml = ['this_stream', '7d', '30d', 'alltime'].map((w) => {
-      const active = cfg.windows.includes(w);
-      return `
-        <button type="button" class="win-btn ${active ? 'active' : ''}" data-board="${board}" data-window="${w}">
-          ${w === 'this_stream' ? 'This Stream' : w}
-        </button>
-      `;
-    }).join('');
     return `
       <div class="board-section">
         <label class="field row">
@@ -423,41 +429,13 @@ function renderBoards() {
           <span>${BOARD_LABELS[board]}</span>
           <span class="board-symbol">${BOARD_UNITS[board].symbol}</span>
         </label>
-        <div class="board-windows">${windowsHtml}</div>
         <label class="field">
-          <span>Max ranks</span>
-          <input id="board-rank-${board}" type="number" min="1" max="100" value="${cfg.rankCount}" class="input" data-board="${board}">
-        </label>
-        <label class="field">
-          <span>Board label</span>
+          <span>Etiqueta</span>
           <input id="board-label-${board}" type="text" placeholder="${BOARD_LABELS[board]}" value="${settings.boardLabels[board] ?? ''}" class="input" data-board="${board}">
         </label>
       </div>
     `;
   }).join('');
-
-  container.querySelectorAll('.win-btn').forEach((btn) => {
-    btn.addEventListener('click', (e) => {
-      const board = e.target.dataset.board;
-      const window = e.target.dataset.window;
-      const cfg = settings.boards[board] || { active: true, windows: [], rankCount: 10 };
-      const windows = cfg.windows.includes(window)
-        ? cfg.windows.filter((w) => w !== window)
-        : [...cfg.windows, window];
-      settings = applySettings(settings, { boards: { ...settings.boards, [board]: { ...cfg, windows } } });
-      syncUI();
-      renderBoards();
-    });
-  });
-
-  container.querySelectorAll('input[type="number"][data-board]').forEach((el) => {
-    el.addEventListener('change', (e) => {
-      const board = e.target.dataset.board;
-      const cfg = settings.boards[board] || {};
-      settings = applySettings(settings, { boards: { ...settings.boards, [board]: { ...cfg, rankCount: Number(e.target.value) || 10 } } });
-      syncUI();
-    });
-  });
 
   container.querySelectorAll('input[type="checkbox"][id^="board-active-"]').forEach((el) => {
     el.addEventListener('change', (e) => {
@@ -504,6 +482,36 @@ $('rotation-interval').addEventListener('change', (e) => {
   syncUI();
 });
 
+['this_stream', '7d', '30d', 'alltime'].forEach((w) => {
+  const el = $('win-' + w);
+  if (el) {
+    el.addEventListener('change', (e) => {
+      const boards = { ...settings.boards };
+      for (const b of Object.keys(boards)) {
+        const cfg = boards[b];
+        const windows = e.target.checked
+          ? ([...new Set([...cfg.windows, w])])
+          : cfg.windows.filter((x) => x !== w);
+        boards[b] = { ...cfg, windows };
+      }
+      settings = applySettings(settings, { boards });
+      syncUI();
+      renderBoards();
+    });
+  }
+});
+
+$('top-maximo').addEventListener('change', (e) => {
+  const n = Number(e.target.value) || 10;
+  const boards = { ...settings.boards };
+  for (const b of Object.keys(boards)) {
+    boards[b] = { ...boards[b], rankCount: n };
+  }
+  settings = applySettings(settings, { boards });
+  syncUI();
+  renderBoards();
+});
+
 const BTN_THEME_RESET = $('theme-reset');
 if (BTN_THEME_RESET) {
   BTN_THEME_RESET.addEventListener('click', () => {
@@ -516,7 +524,7 @@ async function loadServerSettings() {
   try {
     const res = await fetchJSON('/settings', { method: 'GET' });
     if (!res.ok) {
-      setSaveStatus('Could not load settings');
+      setSaveStatus('No se pudieron cargar las configuraciones');
       return;
     }
     const data = await res.json();
@@ -537,7 +545,7 @@ async function loadServerSettings() {
 BTN_SAVE.addEventListener('click', async () => {
   BTN_SAVE.disabled = true;
   BTN_SAVE.textContent = 'Saving…';
-  setSaveStatus('Saving…');
+  setSaveStatus('Guardando…');
   try {
     const res = await fetchJSON('/settings', {
       method: 'PUT',
@@ -554,14 +562,14 @@ BTN_SAVE.addEventListener('click', async () => {
     settings = applySettings(DEFAULT_SETTINGS, data.settings);
     syncUI();
     renderBoards();
-    setSaveStatus('Saved — overlay updated');
-    flash('Settings saved');
+    setSaveStatus('Guardado — overlay actualizado');
+    flash('Configuración guardada');
   } catch (e) {
-    setSaveStatus('Save failed');
-    flash('Save failed', 'err');
+    setSaveStatus('Error al guardar');
+    flash('Error al guardar', 'err');
   } finally {
     BTN_SAVE.disabled = false;
-    BTN_SAVE.textContent = 'Save settings';
+    BTN_SAVE.textContent = 'Guardar configuración';
   }
 });
 

@@ -226,8 +226,8 @@ export const BOARD_UNITS = {
 };
 
 export const BOARD_LABELS = {
-  points: 'Points',
-  donations: 'Donations',
+  points: 'Puntos',
+  donations: 'Donaciones',
   bits: 'Bits',
   subs: 'Subs',
   raiders: 'Raiders',
