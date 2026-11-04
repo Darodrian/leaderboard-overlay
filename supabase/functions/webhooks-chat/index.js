@@ -47,12 +47,65 @@ export async function handler(request) {
   const body = await request.json().catch(() => null);
   const userId = typeof body?.userId === 'string' ? body.userId.trim() : '';
   const username = typeof body?.username === 'string' ? body.username.trim() : '';
+  const text = typeof body?.text === 'string' ? body.text : '';
   const isBot = body?.isBot === true;
   const isBroadcaster = body?.isBroadcaster === true;
   const isMod = body?.isMod === true;
 
   if (!userId || !username) {
     return new Response(JSON.stringify({ error: 'userId and username required' }), { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
+  }
+
+  // ---- Leaderboard chat commands (broadcaster + mods only) ----
+  const normalized = text.trim().toLowerCase().replace(/\s+/g, ' ');
+  const isRefresh = normalized === '!leaderboard refresh';
+  const isClearStream = normalized === '!leaderboard clear stream';
+  const isModerator = userId === streamer.twitch_user_id || isBroadcaster || isMod;
+
+  if (isRefresh || isClearStream) {
+    if (!isModerator) {
+      return new Response(JSON.stringify({ error: 'moderator only' }), { status: 403, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
+    }
+
+    if (isClearStream) {
+      const now = new Date().toISOString();
+      await supabase.from('stream_windows')
+        .update({ is_active: false, ended_at: now })
+        .eq('streamer_id', streamer.id)
+        .eq('window_type', 'this_stream')
+        .eq('is_active', true);
+      await supabase.from('stream_windows').insert({
+        streamer_id: streamer.id,
+        window_type: 'this_stream',
+        started_at: now,
+        is_active: true,
+      });
+      await supabase.rpc('flush_streamer_aggregates', {
+        p_streamer_id: streamer.id,
+        p_force: true,
+      });
+    }
+
+    const event = isRefresh ? 'command.refresh' : 'command.clear-stream';
+    try {
+      await fetch(`${SUPABASE_URL}/realtime/v1/api/broadcast`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+        },
+        body: JSON.stringify({
+          messages: [{
+            topic: `overlay:${streamer.obs_token}`,
+            event,
+            payload: { type: event },
+          }],
+        }),
+      });
+    } catch { /* non-fatal */ }
+
+    return new Response(null, { status: 204, headers: corsHeaders(origin) });
   }
 
   const shouldCount =
