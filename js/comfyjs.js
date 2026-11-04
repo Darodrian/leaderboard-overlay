@@ -15,10 +15,7 @@ export function initComfyJS(channel, handlersArg) {
       return;
     }
 
-    ComfyJS.Init({
-      channel: channel.replace('#', ''),
-      commands: true,
-    });
+    ComfyJS.Init(channel.replace('#', ''), null, channel.replace('#', ''));
 
     ComfyJS.onChat = (user, message, badges, self, extra) => {
       const msg = {
