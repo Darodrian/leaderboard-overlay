@@ -379,6 +379,12 @@ window.addEventListener('message', (e) => {
   if (!state) return;
   if (e.data && e.data.type === 'settings.update' && e.data.settings) {
     state.settings = mergeSettings(e.data.settings);
+    const activeBoardCfg = state.settings.boards[activeBoard];
+    const activeWindows = activeBoardCfg?.windows || ['this_stream'];
+    if (!activeWindows.includes(activeWindow)) {
+      activeWindow = activeWindows[0] ?? 'this_stream';
+      if (state.activeWindow !== activeWindow) state.activeWindow = activeWindow;
+    }
     render();
   }
 });
