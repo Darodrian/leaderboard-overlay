@@ -130,7 +130,12 @@ function render() {
     if (state.activeBoard !== nextBoard) state.activeBoard = nextBoard;
     activeBoard = nextBoard;
   }
-  if (!activeWindow) activeWindow = state.activeWindow;
+  const activeBoardCfg = state.settings.boards[activeBoard];
+  const activeWindows = activeBoardCfg?.windows || ['this_stream'];
+  if (!activeWindows.includes(activeWindow)) {
+    activeWindow = activeWindows[0] ?? 'this_stream';
+    if (state.activeWindow !== activeWindow) state.activeWindow = activeWindow;
+  }
 
   if (settings.screenLayout === 'single') {
     const bs = state.boards[activeBoard];
@@ -303,6 +308,12 @@ function applyLiveSettings(payload) {
   const nextBoard = ALL_BOARD_TYPES.find((bt) => state.settings.boards[bt]?.active) ?? 'points';
   if (state.activeBoard !== nextBoard) state.activeBoard = nextBoard;
   if (!state.settings.boards[activeBoard]?.active) activeBoard = nextBoard;
+  const activeBoardCfg = state.settings.boards[activeBoard];
+  const activeWindows = activeBoardCfg?.windows || ['this_stream'];
+  if (!activeWindows.includes(activeWindow)) {
+    activeWindow = activeWindows[0] ?? 'this_stream';
+    if (state.activeWindow !== activeWindow) state.activeWindow = activeWindow;
+  }
   render();
 }
 

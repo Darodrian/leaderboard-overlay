@@ -1,14 +1,14 @@
 /* OBS overlay */
 @font-face {
   font-family: 'Coming Soon';
-  src: url('/fonts/ComingSoon-Regular.woff2') format('woff2');
+  src: url('../fonts/ComingSoon-Regular.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: 'Z Pix';
-  src: url('/fonts/zpix.woff2') format('woff2');
+  src: url('../fonts/zpix.woff2') format('woff2');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
