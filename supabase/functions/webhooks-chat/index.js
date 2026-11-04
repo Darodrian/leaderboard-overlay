@@ -48,6 +48,7 @@ export async function handler(request) {
   const userId = typeof body?.userId === 'string' ? body.userId.trim() : '';
   const username = typeof body?.username === 'string' ? body.username.trim() : '';
   const text = typeof body?.text === 'string' ? body.text : '';
+  const messageId = typeof body?.messageId === 'string' ? body.messageId.trim() : '' || null;
   const isBot = body?.isBot === true;
   const isBroadcaster = body?.isBroadcaster === true;
   const isMod = body?.isMod === true;
@@ -115,13 +116,18 @@ export async function handler(request) {
   if (shouldCount) {
     const { error } = await supabase.from('chat_events').insert({
       streamer_id: streamer.id,
+      twitch_message_id: messageId,
       twitch_user_id: userId,
       username,
       is_bot: isBot,
       is_broadcaster: isBroadcaster,
       is_mod: isMod,
     });
-    if (error) return new Response(JSON.stringify({ error: 'chat event failed' }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
+    // Ignore duplicate inserts from multiple overlay instances sharing
+    // the same Twitch message id; any other insert error is fatal.
+    if (error && error.code !== '23505') {
+      return new Response(JSON.stringify({ error: 'chat event failed' }), { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) } });
+    }
   }
 
   await supabase.rpc('flush_streamer_aggregates', {

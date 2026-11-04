@@ -22,6 +22,7 @@ export function initComfyJS(channel, handlersArg) {
         userId: (extra && extra.userId) || '',
         username: user,
         text: message,
+        messageId: (extra && extra.id) || '',
         isSelf: !!self,
         badges: (extra && extra.badges) || {},
         isBot: (extra && extra.badges && extra.badges.bot) === '1',
