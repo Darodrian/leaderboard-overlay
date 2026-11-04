@@ -248,9 +248,17 @@ function startRotation() {
 }
 
 function startComfyJS() {
-  if (!state) return;
+  console.log('[debug] startComfyJS called, state:', !!state);
+  if (!state) {
+    console.warn('[debug] startComfyJS: no state, returning');
+    return;
+  }
   const login = String(state.settings?.twitchLogin || '');
-  if (!login) return;
+  console.log('[debug] startComfyJS: twitchLogin =', JSON.stringify(login));
+  if (!login) {
+    console.warn('[debug] startComfyJS: empty login, returning');
+    return;
+  }
   const channel = '#' + login;
   initComfyJS(channel, {
     onMessage: async (msg) => {
@@ -270,9 +278,13 @@ function startComfyJS() {
         console.warn('[comfyjs] chat event failed', e);
       }
     },
-    onConnect: () => console.log('[comfyjs] connected to', channel),
+    onConnect: () => {
+      console.log('[comfyjs] connected to', channel);
+      console.log('[debug] startComfyJS: onConnect fired for', channel);
+    },
     onDisconnect: () => console.warn('[comfyjs] disconnected'),
   }).catch((e) => console.warn('[comfyjs] init failed', e));
+  console.log('[debug] startComfyJS: initComfyJS called for', channel);
 }
 
 function applyState(next) {

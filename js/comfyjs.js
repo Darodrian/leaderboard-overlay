@@ -10,11 +10,13 @@ export function initComfyJS(channel, handlersArg) {
   return new Promise((resolve, reject) => {
     // ComfyJS is loaded via CDN script tag before this module runs.
     const ComfyJS = window.ComfyJS;
+    console.log('[debug] comfyjs: initComfyJS called, ComfyJS loaded:', !!ComfyJS);
     if (!ComfyJS) {
       reject(new Error('ComfyJS not loaded. Include the CDN script tag.'));
       return;
     }
 
+    console.log('[debug] comfyjs: calling ComfyJS.Init with channel:', channel.replace('#', ''));
     ComfyJS.Init(channel.replace('#', ''));
 
     ComfyJS.onChat = (user, message, flags, self, extra) => {
@@ -37,6 +39,7 @@ export function initComfyJS(channel, handlersArg) {
     };
 
     ComfyJS.onConnected = () => {
+      console.log('[debug] comfyjs: onConnected fired');
       comfy = ComfyJS;
       if (handlers.onConnect) handlers.onConnect();
       resolve();
