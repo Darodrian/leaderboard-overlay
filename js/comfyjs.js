@@ -30,7 +30,23 @@ export function initComfyJS(channel, handlersArg) {
         isBroadcaster: (userBadges && userBadges.broadcaster) === '1',
         isMod: (userBadges && userBadges.mod) === '1',
       };
-      console.debug('[comfyjs] onChat', { user, message, flags, self, extra, msg });
+      if (handlers.onMessage) handlers.onMessage(msg);
+    };
+
+    ComfyJS.onCommand = (user, command, message, flags, extra) => {
+      const userBadges = (extra && extra.userBadges) || {};
+      const text = message ? `!${command} ${message}` : `!${command}`;
+      const msg = {
+        userId: (extra && extra.userId) || '',
+        username: user,
+        text,
+        messageId: (extra && extra.id) || '',
+        isSelf: !!(flags && flags.self),
+        badges: userBadges,
+        isBot: (userBadges && userBadges.bot) === '1',
+        isBroadcaster: !!(flags && flags.broadcaster) || (userBadges && userBadges.broadcaster) === '1',
+        isMod: !!(flags && flags.mod) || (userBadges && userBadges.mod) === '1',
+      };
       if (handlers.onMessage) handlers.onMessage(msg);
     };
 
