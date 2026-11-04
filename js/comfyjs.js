@@ -15,9 +15,9 @@ export function initComfyJS(channel, handlersArg) {
       return;
     }
 
-    ComfyJS.Init(channel.replace('#', ''), null, channel.replace('#', ''));
+    ComfyJS.Init(channel.replace('#', ''));
 
-    ComfyJS.onChat = (user, message, badges, self, extra) => {
+    ComfyJS.onChat = (user, message, flags, self, extra) => {
       const msg = {
         userId: (extra && extra.userId) || '',
         username: user,
@@ -29,6 +29,11 @@ export function initComfyJS(channel, handlersArg) {
         isMod: (extra && extra.badges && extra.badges.mod) === '1',
       };
       if (handlers.onMessage) handlers.onMessage(msg);
+    };
+
+    ComfyJS.onError = (err) => {
+      console.warn('[comfyjs] error', err);
+      if (handlers.onError) handlers.onError(err);
     };
 
     ComfyJS.onConnected = () => {
