@@ -81,11 +81,14 @@ export async function handler(request) {
         started_at: now,
         is_active: true,
       });
-      await supabase.rpc('flush_streamer_aggregates', {
-        p_streamer_id: streamer.id,
-        p_force: true,
-      });
     }
+
+    // Refresh recomputes aggregates from existing raw events; clear-stream
+    // already reset the window above, so both end with a force flush.
+    await supabase.rpc('flush_streamer_aggregates', {
+      p_streamer_id: streamer.id,
+      p_force: true,
+    });
 
     const event = isRefresh ? 'command.refresh' : 'command.clear-stream';
     try {

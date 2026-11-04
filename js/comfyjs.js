@@ -18,16 +18,17 @@ export function initComfyJS(channel, handlersArg) {
     ComfyJS.Init(channel.replace('#', ''));
 
     ComfyJS.onChat = (user, message, flags, self, extra) => {
+      const userBadges = (extra && extra.userBadges) || {};
       const msg = {
         userId: (extra && extra.userId) || '',
         username: user,
         text: message,
         messageId: (extra && extra.id) || '',
         isSelf: !!self,
-        badges: (extra && extra.badges) || {},
-        isBot: (extra && extra.badges && extra.badges.bot) === '1',
-        isBroadcaster: (extra && extra.badges && extra.badges.broadcaster) === '1',
-        isMod: (extra && extra.badges && extra.badges.mod) === '1',
+        badges: userBadges,
+        isBot: (userBadges && userBadges.bot) === '1',
+        isBroadcaster: (userBadges && userBadges.broadcaster) === '1',
+        isMod: (userBadges && userBadges.mod) === '1',
       };
       if (handlers.onMessage) handlers.onMessage(msg);
     };
