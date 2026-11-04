@@ -20,7 +20,7 @@ export function initComfyJS(channel, handlersArg) {
       commands: true,
     });
 
-    ComfyJS.onChat = (user, message, self, extra) => {
+    ComfyJS.onChat = (user, message, badges, self, extra) => {
       const msg = {
         userId: (extra && extra.userId) || '',
         username: user,
