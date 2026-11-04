@@ -45,12 +45,14 @@ let refreshTimer = null;
 let activeBoard = '';
 let activeWindow = '';
 
+const LOCAL_FONTS = ['Coming Soon', 'Z Pix'];
+
 function applyCssVars(s) {
   const vars = cssVars(s);
   for (const [key, value] of Object.entries(vars)) {
     document.documentElement.style.setProperty(key, value);
   }
-  if (s.fontFamily !== 'system') {
+  if (s.fontFamily !== 'system' && !LOCAL_FONTS.includes(s.fontFamily)) {
     let link = document.getElementById('google-fonts');
     if (link) link.remove();
     const l = document.createElement('link');
@@ -124,7 +126,7 @@ function render() {
   applyCssVars(settings);
 
   if (!state.boards[activeBoard]?.active) {
-    const nextBoard = state.activeBoard ?? ALL_BOARD_TYPES.find((bt) => state.settings.boards[bt]?.active) ?? 'points';
+    const nextBoard = ALL_BOARD_TYPES.find((bt) => state.settings.boards[bt]?.active) ?? 'points';
     if (state.activeBoard !== nextBoard) state.activeBoard = nextBoard;
     activeBoard = nextBoard;
   }
