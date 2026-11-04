@@ -63,7 +63,7 @@ function updatePreview() {
   if (previewToken !== obsToken) {
     previewToken = obsToken;
     const base = new URL('overlay.html', location.href);
-    base.search = 'token=' + encodeURIComponent(obsToken);
+    base.search = 'token=' + encodeURIComponent(obsToken) + '&preview=1';
     base.search += '&_=' + Date.now();
 
     PREVIEW_IFRAME.onload = () => {

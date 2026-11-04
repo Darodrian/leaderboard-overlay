@@ -18,13 +18,19 @@
 <div id="overlay-root" class="lb-root"></div>
 
 <script type="module">
-import { loadOverlayState, FUNCTIONS_BASE, SUPABASE_ANON_KEY } from './js/overlayData.js';
+import { loadOverlayState, FUNCTIONS_BASE, SUPABASE_ANON_KEY, ALL_BOARD_TYPES } from './js/overlayData.js';
 import { initComfyJS } from './js/comfyjs.js';
 import { createBridge } from './js/bridge.js';
 import { cssVars, mergeSettings, BOARD_LABELS, formatBoardQuantity } from './js/settings.js';
 
 const token = (() => {
-  try { return new URLSearchParams(location.search).get('token') || ''; } catch { return ''; }
+  try {
+    const params = new URLSearchParams(location.search);
+    return params.get('token') || '';
+  } catch { return ''; }
+})();
+const isPreview = (() => {
+  try { return new URLSearchParams(location.search).get('preview') === '1'; } catch { return false; }
 })();
 
 const root = document.getElementById('overlay-root');
@@ -52,7 +58,9 @@ function applyCssVars(s) {
     l.rel = 'stylesheet';
     l.href = `https://fonts.googleapis.com/css2?family=${encodeURIComponent(s.fontFamily)}:wght@400;700&display=swap`;
     document.head.appendChild(l);
+    return document.fonts.ready;
   }
+  return Promise.resolve();
 }
 
 function escapeHtml(text) {
@@ -115,7 +123,11 @@ function render() {
   settings = state.settings;
   applyCssVars(settings);
 
-  if (!state.boards[activeBoard]) activeBoard = state.activeBoard;
+  if (!state.boards[activeBoard]?.active) {
+    const nextBoard = state.activeBoard ?? ALL_BOARD_TYPES.find((bt) => state.settings.boards[bt]?.active) ?? 'points';
+    if (state.activeBoard !== nextBoard) state.activeBoard = nextBoard;
+    activeBoard = nextBoard;
+  }
   if (!activeWindow) activeWindow = state.activeWindow;
 
   if (settings.screenLayout === 'single') {
@@ -248,17 +260,9 @@ function startRotation() {
 }
 
 function startComfyJS() {
-  console.log('[debug] startComfyJS called, state:', !!state);
-  if (!state) {
-    console.warn('[debug] startComfyJS: no state, returning');
-    return;
-  }
+  if (!state || isPreview) return;
   const login = String(state.settings?.twitchLogin || '');
-  console.log('[debug] startComfyJS: twitchLogin =', JSON.stringify(login));
-  if (!login) {
-    console.warn('[debug] startComfyJS: empty login, returning');
-    return;
-  }
+  if (!login) return;
   const channel = '#' + login;
   initComfyJS(channel, {
     onMessage: async (msg) => {
@@ -278,25 +282,25 @@ function startComfyJS() {
         console.warn('[comfyjs] chat event failed', e);
       }
     },
-    onConnect: () => {
-      console.log('[comfyjs] connected to', channel);
-      console.log('[debug] startComfyJS: onConnect fired for', channel);
-    },
+    onConnect: () => console.log('[comfyjs] connected to', channel),
     onDisconnect: () => console.warn('[comfyjs] disconnected'),
   }).catch((e) => console.warn('[comfyjs] init failed', e));
-  console.log('[debug] startComfyJS: initComfyJS called for', channel);
 }
 
-function applyState(next) {
+async function applyState(next) {
   if (!next) return;
   state = next;
   state.settings = mergeSettings(state.settings || {});
+  await applyCssVars(state.settings);
   render();
 }
 
 function applyLiveSettings(payload) {
   if (!state || !payload || !payload.settings) return;
   state.settings = mergeSettings(payload.settings);
+  const nextBoard = ALL_BOARD_TYPES.find((bt) => state.settings.boards[bt]?.active) ?? 'points';
+  if (state.activeBoard !== nextBoard) state.activeBoard = nextBoard;
+  if (!state.settings.boards[activeBoard]?.active) activeBoard = nextBoard;
   render();
 }
 
@@ -346,7 +350,7 @@ async function main() {
       return;
     }
     setupNotice.hidden = true;
-    applyState(next);
+    await applyState(next);
     startComfyJS();
     startLive();
   } catch (e) {

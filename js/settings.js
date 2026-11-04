@@ -201,7 +201,9 @@ export function cssVars(settings) {
     '--lb-font-family': settings.fontFamily.includes(' ')
       ? `"${settings.fontFamily}"`
       : settings.fontFamily,
-    '--lb-label-align': settings.labelAlignment,
+    '--lb-label-align': settings.labelAlignment === 'left' ? 'flex-start'
+      : settings.labelAlignment === 'right' ? 'flex-end'
+      : settings.labelAlignment,
     ...settings.theme.overrides,
   };
 }
