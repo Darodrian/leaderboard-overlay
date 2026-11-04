@@ -33,7 +33,6 @@ html, body {
   background: var(--lb-bg, #0b1020);
   border-radius: var(--lb-radius, 16px);
   padding: var(--lb-padding, 12px);
-  animation: lb-fade 400ms ease;
   pointer-events: auto;
 }
 
@@ -146,11 +145,6 @@ html, body {
   height: 100%;
   background: var(--lb-accent, #7c9cff);
   transition: width 400ms ease;
-}
-
-@keyframes lb-fade {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
 }
 
 .setup-box {
