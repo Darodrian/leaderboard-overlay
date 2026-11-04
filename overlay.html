@@ -274,7 +274,8 @@ function startComfyJS() {
   initComfyJS(channel, {
     onMessage: async (msg) => {
       try {
-        await fetch(FUNCTIONS_BASE + '/webhooks-chat/' + token, {
+        console.debug('[overlay] comfyjs onMessage', msg);
+        const res = await fetch(FUNCTIONS_BASE + '/webhooks-chat/' + token, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', apikey: SUPABASE_ANON_KEY },
           body: JSON.stringify({
@@ -287,6 +288,7 @@ function startComfyJS() {
             isMod: msg.isMod,
           }),
         });
+        console.debug('[overlay] webhooks-chat response', res.status, await res.text());
       } catch (e) {
         console.warn('[comfyjs] chat event failed', e);
       }

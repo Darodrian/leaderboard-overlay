@@ -30,6 +30,7 @@ export function initComfyJS(channel, handlersArg) {
         isBroadcaster: (userBadges && userBadges.broadcaster) === '1',
         isMod: (userBadges && userBadges.mod) === '1',
       };
+      console.debug('[comfyjs] onChat', { user, message, flags, self, extra, msg });
       if (handlers.onMessage) handlers.onMessage(msg);
     };
 
