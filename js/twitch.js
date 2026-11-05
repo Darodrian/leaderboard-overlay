@@ -5,7 +5,6 @@ export const DEFAULT_SCOPES = [
   'moderator:read:chatters',
   'bits:read',
   'channel:read:subscriptions',
-  'channel:read:raids',
 ];
 export const OAUTH_STATE_COOKIE = 'twitch_oauth_state';
 

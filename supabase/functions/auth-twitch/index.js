@@ -335,7 +335,7 @@ export async function handler(request) {
   authUrl.searchParams.set('client_id', clientId);
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('response_type', 'code');
-  authUrl.searchParams.set('scope', 'user:read:email moderator:read:chatters bits:read channel:read:subscriptions channel:read:raids');
+  authUrl.searchParams.set('scope', 'user:read:email moderator:read:chatters bits:read channel:read:subscriptions');
   authUrl.searchParams.set('state', state);
 
   return redirectTo(authUrl, [
