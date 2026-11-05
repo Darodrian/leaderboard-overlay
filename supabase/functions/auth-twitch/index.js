@@ -12,6 +12,7 @@ const OAUTH_STATE_MAX_AGE = 600;
 const AUTHORIZE_URL = 'https://id.twitch.tv/oauth2/authorize';
 const TOKEN_URL = 'https://id.twitch.tv/oauth2/token';
 const USERS_URL = 'https://api.twitch.tv/helix/users';
+const TWITCH_API = 'https://api.twitch.tv/helix';
 
 const ALLOWED_ORIGINS = (Deno.env.get('CORS_ORIGINS') || '*').split(',').map(s => s.trim())
 
@@ -129,6 +130,58 @@ function resolveRedirectUri(requestUrl) {
   return `${url.origin}/functions/v1/auth-twitch`;
 }
 
+const EVENT_SUB_SUBSCRIPTIONS = [
+  { type: 'channel.cheer', version: '1' },
+  { type: 'channel.bits.use', version: '1' },
+  { type: 'channel.subscribe', version: '1' },
+  { type: 'channel.subscription.message', version: '1' },
+  { type: 'channel.subscription.gift', version: '1' },
+  { type: 'channel.raid', version: '1' },
+];
+
+// Creates the EventSub webhook subscriptions that feed webhooks-twitch so
+// bits, subs, gifts, and raids land on the leaderboard. Best-effort: failures
+// are logged but never block the OAuth flow.
+async function createEventSubSubscriptions(accessToken, broadcasterUserId) {
+  const callbackUrl = `${SUPABASE_URL}/functions/v1/webhooks-twitch`;
+  const secret = TWITCH_WEBHOOK_SECRET;
+  if (!secret) {
+    console.warn('[auth-twitch] TWITCH_WEBHOOK_SECRET not configured; skipping EventSub subscriptions');
+    return;
+  }
+  for (const { type, version } of EVENT_SUB_SUBSCRIPTIONS) {
+    const body = {
+      type,
+      version,
+      condition: { broadcaster_user_id: broadcasterUserId },
+      transport: { method: 'webhook', callback: callbackUrl, secret },
+    };
+    try {
+      const res = await fetch(`${TWITCH_API}/eventsub/subscriptions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Client-Id': TWITCH_CLIENT_ID,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+      if (res.status === 409) {
+        console.log(`[auth-twitch] EventSub ${type} already subscribed`);
+        continue;
+      }
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        console.warn(`[auth-twitch] EventSub ${type} subscribe failed ${res.status} ${text}`);
+      } else {
+        console.log(`[auth-twitch] EventSub ${type} subscribed`);
+      }
+    } catch (e) {
+      console.warn(`[auth-twitch] EventSub ${type} subscribe error`, e);
+    }
+  }
+}
+
 function redirectTo(location, cookies = []) {
   const headers = new Headers({ Location: location.toString() });
   for (const cookie of cookies) headers.append('Set-Cookie', cookie);
@@ -206,6 +259,10 @@ export async function handler(request) {
         return redirectTo(dashboardTarget(dashboardBase, { error: 'twitch_login_failed' }), [clearStateCookie]);
       }
 
+      // Best-effort: create EventSub subscriptions so bits/subs/raids events
+      // flow into webhooks-twitch. Non-blocking — auth completes even if this fails.
+      createEventSubSubscriptions(tokens.access_token, user.id).catch(() => {});
+
       const encryptedToken = await encryptToken(tokens.access_token, TOKEN_ENCRYPTION_KEY);
 
       let streamerId;
@@ -278,7 +335,7 @@ export async function handler(request) {
   authUrl.searchParams.set('client_id', clientId);
   authUrl.searchParams.set('redirect_uri', redirectUri);
   authUrl.searchParams.set('response_type', 'code');
-  authUrl.searchParams.set('scope', 'user:read:email moderator:read:chatters');
+  authUrl.searchParams.set('scope', 'user:read:email moderator:read:chatters bits:read channel:read:subscriptions channel:read:raids');
   authUrl.searchParams.set('state', state);
 
   return redirectTo(authUrl, [

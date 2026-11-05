@@ -1,6 +1,12 @@
 import { TWITCH_CLIENT_ID, APP_URL, FUNCTIONS_BASE } from './config.js';
 
-export const DEFAULT_SCOPES = ['user:read:email', 'moderator:read:chatters'];
+export const DEFAULT_SCOPES = [
+  'user:read:email',
+  'moderator:read:chatters',
+  'bits:read',
+  'channel:read:subscriptions',
+  'channel:read:raids',
+];
 export const OAUTH_STATE_COOKIE = 'twitch_oauth_state';
 
 const AUTHORIZE_URL = 'https://id.twitch.tv/oauth2/authorize';

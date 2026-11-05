@@ -108,6 +108,22 @@ export function parseEvent(subscriptionType, event) {
         isAnonymous: event.is_anonymous === true,
       };
 
+    // channel.bits.use is Twitch's newer all-purpose bits event. It fires for
+    // cheers and for power-ups; only count cheers so power-ups don't inflate
+    // the bits leaderboard.
+    case 'channel.bits.use':
+      if (event.type !== 'cheer') {
+        return { kind: 'ignore', reason: 'power-up' };
+      }
+      return {
+        kind: 'credit',
+        eventType: 'bit',
+        userId: toText(event.user_id),
+        username: displayName(event),
+        amount: toNumber(event.bits),
+        isAnonymous: event.is_anonymous === true,
+      };
+
     case 'channel.raid':
       return {
         kind: 'credit',

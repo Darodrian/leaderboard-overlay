@@ -73,6 +73,17 @@ test('parseEvent credits cheer bits', () => {
   assert.deepStrictEqual(p, { kind: 'credit', eventType: 'bit', userId: 'u1', username: 'U', amount: 500, isAnonymous: false });
 });
 
+test('parseEvent credits cheer from channel.bits.use', () => {
+  const p = parseEvent('channel.bits.use', { user_id: 'u1', user_login: 'u', user_name: 'U', bits: 250, type: 'cheer', is_anonymous: false });
+  assert.deepStrictEqual(p, { kind: 'credit', eventType: 'bit', userId: 'u1', username: 'U', amount: 250, isAnonymous: false });
+});
+
+test('parseEvent ignores power-ups from channel.bits.use', () => {
+  const p = parseEvent('channel.bits.use', { user_id: 'u1', user_login: 'u', user_name: 'U', bits: 0, type: 'power_up', power_up: {} });
+  assert.strictEqual(p.kind, 'ignore');
+  assert.strictEqual(p.reason, 'power-up');
+});
+
 test('parseEvent credits raider from broadcaster fields', () => {
   const p = parseEvent('channel.raid', { from_broadcaster_user_id: 'r1', from_broadcaster_user_login: 'r', from_broadcaster_user_name: 'R', viewers: 42 });
   assert.deepStrictEqual(p, { kind: 'credit', eventType: 'raid', userId: 'r1', username: 'R', amount: 42, isAnonymous: false });
